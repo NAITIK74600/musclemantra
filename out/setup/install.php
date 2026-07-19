@@ -27,7 +27,7 @@ $errors  = [];
 $step = function(string $label, callable $fn) use (&$results, &$errors): void {
     try { $fn(); $results[] = "✅ $label"; }
     catch (Throwable $e) { $errors[] = "❌ $label: " . $e->getMessage(); }
-}
+};
 
 try {
     $pdo = new PDO(
