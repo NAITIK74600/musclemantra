@@ -10,9 +10,9 @@
  */
 
 require_once __DIR__ . '/_config.php';
+require_once __DIR__ . '/invoice-pdf.php';
 
 if (!function_exists('mm_send_mail')) {
-
     /** Read one SMTP reply line and assert its code. */
     function mm_smtp_expect($fp, string $code): bool {
         $data = '';
@@ -115,13 +115,42 @@ if (!function_exists('mm_send_mail')) {
             $headers .= "To: <{$to}>\r\n";
             $headers .= "Subject: {$encSubj}\r\n";
             $headers .= "MIME-Version: 1.0\r\n";
-            $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-            $headers .= "Content-Transfer-Encoding: base64\r\n";
 
-            $body = rtrim(chunk_split(base64_encode($htmlBody)));
+            // Optional file attachments → build a multipart/mixed message.
+            $attachments = (isset($opts['attachments']) && is_array($opts['attachments']))
+                ? $opts['attachments'] : [];
+
+            if ($attachments) {
+                $headers .= "Content-Type: multipart/mixed; boundary=\"{$boundary}\"\r\n";
+
+                $mb  = "--{$boundary}\r\n";
+                $mb .= "Content-Type: text/html; charset=UTF-8\r\n";
+                $mb .= "Content-Transfer-Encoding: base64\r\n\r\n";
+                $mb .= rtrim(chunk_split(base64_encode($htmlBody))) . "\r\n";
+
+                foreach ($attachments as $att) {
+                    $an = preg_replace('/[^A-Za-z0-9._\-]/', '_', (string)($att['name'] ?? 'attachment'));
+                    $am = (string)($att['mime'] ?? 'application/octet-stream');
+                    $ad = (string)($att['data'] ?? '');
+                    if ($ad === '') continue;
+                    $mb .= "--{$boundary}\r\n";
+                    $mb .= "Content-Type: {$am}; name=\"{$an}\"\r\n";
+                    $mb .= "Content-Transfer-Encoding: base64\r\n";
+                    $mb .= "Content-Disposition: attachment; filename=\"{$an}\"\r\n\r\n";
+                    $mb .= rtrim(chunk_split(base64_encode($ad))) . "\r\n";
+                }
+                $mb .= "--{$boundary}--\r\n";
+
+                $payload = $headers . "\r\n" . $mb;
+            } else {
+                $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+                $headers .= "Content-Transfer-Encoding: base64\r\n";
+
+                $body = rtrim(chunk_split(base64_encode($htmlBody)));
+                $payload = $headers . "\r\n" . $body . "\r\n";
+            }
 
             // Dot-stuffing: any line starting with '.' must be escaped.
-            $payload = $headers . "\r\n" . $body . "\r\n";
             $payload = preg_replace('/^\./m', '..', $payload);
 
             fwrite($fp, $payload . "\r\n.\r\n");
@@ -260,6 +289,19 @@ if (!function_exists('mm_send_mail')) {
             ? '<p style="color:rgba(245,245,245,0.45);font-size:12px;line-height:1.5;margin:14px 0 0">Delivering to:<br>' . $addr . '</p>'
             : '';
 
+        // Generate the invoice PDF and attach it (best-effort — never fails the email).
+        $invoiceAttachment = [];
+        try {
+            $pdfBytes = mm_invoice_pdf($o);
+            if (is_string($pdfBytes) && $pdfBytes !== '') {
+                $invoiceAttachment[] = [
+                    'name' => 'Invoice-' . preg_replace('/[^A-Za-z0-9]/', '', $id) . '.pdf',
+                    'mime' => 'application/pdf',
+                    'data' => $pdfBytes,
+                ];
+            }
+        } catch (Throwable $e) { /* skip attachment on any error */ }
+
         $html = '<div style="background:#050505;padding:32px 0;font-family:Arial,Helvetica,sans-serif">'
             . '<div style="max-width:480px;margin:0 auto;background:#0d0d0d;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden">'
             . '<div style="height:3px;background:#FF6B00"></div>'
@@ -286,6 +328,7 @@ if (!function_exists('mm_send_mail')) {
             'from'     => MAIL_ORDER_FROM,
             'fromName' => MAIL_ORDER_FROM_NAME,
             'replyTo'  => MAIL_ORDER_FROM,
+            'attachments' => $invoiceAttachment,
         ]);
     }
 

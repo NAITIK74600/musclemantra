@@ -297,36 +297,36 @@ export default function InvoiceClient() {
         <div className="max-w-[700px] mx-auto bg-[#111] border border-[rgba(255,255,255,0.06)] rounded-2xl overflow-hidden print:border-0 print:shadow-none print:rounded-none print:bg-white">
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-[#1a0a00] to-[#0d0d0d] px-9 py-8 border-b-2 border-[#FF6B00] print:from-white print:to-white print:border-orange-500">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <Image src="/logo.png" alt="Muscle Mantra" width={52} height={52} className="rounded-xl" />
-                <div>
-                  <div className="font-[var(--font-montserrat)] font-black text-xl text-[#FF6B00] tracking-tight">MUSCLE MANTRA</div>
-                  <div className="text-[10px] text-[rgba(245,245,245,0.35)] tracking-[2px] uppercase print:text-gray-400">Fuel Your Strength</div>
+          <div className="bg-gradient-to-r from-[#1a0a00] to-[#0d0d0d] px-6 sm:px-9 py-8 border-b-2 border-[#FF6B00] print:from-white print:to-white print:border-orange-500">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Image src="/logo.png" alt="Muscle Mantra" width={52} height={52} className="rounded-xl shrink-0 w-11 h-11 sm:w-[52px] sm:h-[52px]" />
+                <div className="min-w-0">
+                  <div className="font-[var(--font-montserrat)] font-black text-base sm:text-xl text-[#FF6B00] tracking-tight leading-tight">MUSCLE MANTRA</div>
+                  <div className="text-[9px] sm:text-[10px] text-[rgba(245,245,245,0.35)] tracking-[2px] uppercase print:text-gray-400">Fuel Your Strength</div>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 <div className="text-[10px] font-bold tracking-[2px] uppercase text-[rgba(245,245,245,0.35)] print:text-gray-400">Invoice</div>
-                <div className="font-[var(--font-montserrat)] font-black text-2xl text-white print:text-black mt-1">#{order.id}</div>
-                <div className="text-xs text-[rgba(245,245,245,0.45)] mt-1 print:text-gray-500">{date}</div>
+                <div className="font-[var(--font-montserrat)] font-black text-sm sm:text-2xl text-white print:text-black mt-1 break-all">#{order.id}</div>
+                <div className="text-[11px] sm:text-xs text-[rgba(245,245,245,0.45)] mt-1 print:text-gray-500 whitespace-nowrap">{date}</div>
               </div>
             </div>
           </div>
 
           {/* Addresses */}
-          <div className="px-9 py-7 grid grid-cols-2 gap-6 border-b border-[rgba(255,255,255,0.06)] print:border-gray-200">
-            <div>
+          <div className="px-6 sm:px-9 py-7 grid grid-cols-2 gap-4 sm:gap-6 border-b border-[rgba(255,255,255,0.06)] print:border-gray-200">
+            <div className="min-w-0">
               <div className="text-[10px] font-bold tracking-[2px] uppercase text-[#FF6B00] mb-2">Bill To</div>
-              <div className="font-bold text-white text-base print:text-black">{order.shippingAddress.name}</div>
+              <div className="font-bold text-white text-sm sm:text-base print:text-black break-words">{order.shippingAddress.name}</div>
               <div className="text-sm text-[rgba(245,245,245,0.5)] mt-1 print:text-gray-500">{order.shippingAddress.phone}</div>
               {order.shippingAddress.email && (
-                <div className="text-sm text-[rgba(245,245,245,0.5)] print:text-gray-500">{order.shippingAddress.email}</div>
+                <div className="text-[13px] text-[rgba(245,245,245,0.5)] print:text-gray-500 break-all">{order.shippingAddress.email}</div>
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-[10px] font-bold tracking-[2px] uppercase text-[#FF6B00] mb-2">Ship To</div>
-              <div className="text-sm text-[rgba(245,245,245,0.6)] leading-relaxed print:text-gray-600">
+              <div className="text-[13px] sm:text-sm text-[rgba(245,245,245,0.6)] leading-relaxed print:text-gray-600 break-words">
                 {order.shippingAddress.address},<br />
                 {order.shippingAddress.area}, {order.shippingAddress.city},<br />
                 {order.shippingAddress.state} — {order.shippingAddress.pincode}
@@ -335,7 +335,7 @@ export default function InvoiceClient() {
           </div>
 
           {/* Items */}
-          <div className="px-9 py-6">
+          <div className="px-6 sm:px-9 py-6">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-[#1a1a1a] print:bg-gray-100">
@@ -385,7 +385,7 @@ export default function InvoiceClient() {
             </div>
 
             {/* Payment badge */}
-            <div className="mt-6 inline-flex items-center gap-2 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-xl px-4 py-3 print:bg-gray-50 print:border-gray-200">
+            <div className="mt-6 inline-flex flex-wrap items-center gap-x-2 gap-y-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-xl px-4 py-3 print:bg-gray-50 print:border-gray-200">
               <span className="text-[11px] text-[rgba(245,245,245,0.4)] uppercase tracking-wider print:text-gray-400">Payment</span>
               <span className="text-sm font-bold text-white print:text-black">{PM_LABELS[order.paymentMethod] ?? order.paymentMethod}</span>
               <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -397,7 +397,7 @@ export default function InvoiceClient() {
           </div>
 
           {/* Footer */}
-          <div className="bg-[#0a0a0a] px-9 py-6 border-t border-[rgba(255,255,255,0.06)] text-center print:bg-gray-50 print:border-gray-200">
+          <div className="bg-[#0a0a0a] px-6 sm:px-9 py-6 border-t border-[rgba(255,255,255,0.06)] text-center print:bg-gray-50 print:border-gray-200">
             <p className="text-xs text-[rgba(245,245,245,0.3)] print:text-gray-400">Thank you for shopping with Muscle Mantra!</p>
             <p className="text-[11px] text-[rgba(245,245,245,0.25)] mt-1 print:text-gray-400">
               +91 84096 12737 &nbsp;•&nbsp; admin@musclemantra.shop &nbsp;•&nbsp; musclemantra.shop
