@@ -273,9 +273,17 @@ export default function Navbar() {
         <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)]">
           <div className="container-max py-2 lg:py-2.5 flex items-center gap-2 sm:gap-3">
 
-            {/* Logo */}
-            <Link href="/" className="flex items-center shrink-0">
+            {/* Logo + brand wordmark */}
+            <Link href="/" className="flex items-center gap-2 sm:gap-2.5 shrink-0" aria-label="Muscle Mantra home">
               <Image src="/logo.png" alt="Muscle Mantra" width={48} height={48} className="w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 object-contain" priority />
+              <span className="hidden sm:flex flex-col leading-none">
+                <span className="font-[var(--font-montserrat)] font-black text-white text-[13px] lg:text-[15px] tracking-[0.1em] leading-none">
+                  MUSCLE
+                </span>
+                <span className="font-[var(--font-montserrat)] font-black text-[#FF6B00] text-[13px] lg:text-[15px] tracking-[0.1em] leading-none mt-0.5">
+                  MANTRA
+                </span>
+              </span>
             </Link>
 
             {/* Location picker â€” Patna only */}
