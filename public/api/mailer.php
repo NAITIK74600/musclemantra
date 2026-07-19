@@ -33,14 +33,29 @@ if (!function_exists('mm_send_mail')) {
      * Send an HTML email. Returns true on success, false otherwise.
      * Never throws — failures are swallowed so callers can degrade gracefully.
      */
-    function mm_send_mail(string $to, string $subject, string $htmlBody): bool {
+    /**
+     * Send an HTML email. Returns true on success, false otherwise.
+     * Never throws — failures are swallowed so callers can degrade gracefully.
+     *
+     * $opts (all optional):
+     *   'from'     → header From address   (default MAIL_FROM / noreply@)
+     *   'fromName' → header From name       (default MAIL_FROM_NAME)
+     *   'replyTo'  → Reply-To address       (default MAIL_REPLY_TO)
+     *
+     * The SMTP envelope always uses the ONE authenticated account (SMTP_USER),
+     * so deliverability is unaffected no matter which "from" identity is shown.
+     */
+    function mm_send_mail(string $to, string $subject, string $htmlBody, array $opts = []): bool {
         $host   = SMTP_HOST;
         $port   = SMTP_PORT;
         $secure = strtolower(SMTP_SECURE);
         $user   = SMTP_USER;
         $pass   = SMTP_PASS;
-        $from   = MAIL_FROM;
-        $fromNm = MAIL_FROM_NAME;
+        $from    = (string)($opts['from']     ?? MAIL_FROM);
+        $fromNm  = (string)($opts['fromName'] ?? MAIL_FROM_NAME);
+        $replyTo = (string)($opts['replyTo']  ?? MAIL_REPLY_TO);
+        if (!filter_var($from, FILTER_VALIDATE_EMAIL))    $from    = MAIL_FROM;
+        if (!filter_var($replyTo, FILTER_VALIDATE_EMAIL)) $replyTo = $from;
 
         if (!$host || !$user || !$pass) return false;
         if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
@@ -75,7 +90,7 @@ if (!function_exists('mm_send_mail')) {
             if (!mm_smtp_cmd($fp, base64_encode($user), '334')) { fclose($fp); return false; }
             if (!mm_smtp_cmd($fp, base64_encode($pass), '235')) { fclose($fp); return false; }
 
-            if (!mm_smtp_cmd($fp, "MAIL FROM:<{$from}>", '250')) { fclose($fp); return false; }
+            if (!mm_smtp_cmd($fp, "MAIL FROM:<{$user}>", '250')) { fclose($fp); return false; }
             if (!mm_smtp_cmd($fp, "RCPT TO:<{$to}>", '250')) { fclose($fp); return false; }
             if (!mm_smtp_cmd($fp, 'DATA', '354')) { fclose($fp); return false; }
 
@@ -88,7 +103,7 @@ if (!function_exists('mm_send_mail')) {
             $headers  = "Date: {$date}\r\n";
             $headers .= "Message-ID: {$msgId}\r\n";
             $headers .= "From: {$encFrom} <{$from}>\r\n";
-            $headers .= "Reply-To: " . MAIL_REPLY_TO . "\r\n";
+            $headers .= "Reply-To: " . $replyTo . "\r\n";
             $headers .= "To: <{$to}>\r\n";
             $headers .= "Subject: {$encSubj}\r\n";
             $headers .= "MIME-Version: 1.0\r\n";
@@ -167,6 +182,8 @@ if (!function_exists('mm_send_mail')) {
         $total  = number_format((float)($o['total'] ?? 0));
         $pay    = htmlspecialchars((string)($o['payment_method'] ?? ''), ENT_QUOTES);
         $inv    = SITE_URL . '/invoice/' . rawurlencode($id) . '/';
+        $phone  = preg_replace('/[^0-9]/', '', (string)($o['customer_phone'] ?? $o['phone'] ?? ''));
+        $track  = SITE_URL . '/track/?id=' . rawurlencode($id) . ($phone ? '&phone=' . rawurlencode($phone) : '');
         $items  = $o['items'] ?? [];
         if (is_string($items)) { $items = json_decode($items, true) ?: []; }
 
@@ -248,11 +265,18 @@ if (!function_exists('mm_send_mail')) {
             . $addrBlock
             . '<div style="margin:22px 0 0">'
             . '<a href="' . htmlspecialchars($inv, ENT_QUOTES) . '" style="display:inline-block;background:#FF6B00;color:#fff;font-size:13px;font-weight:bold;text-decoration:none;padding:11px 22px;border-radius:10px">View invoice / track order</a>'
+            . ($kind === 'otp'
+                ? '<a href="' . htmlspecialchars($track, ENT_QUOTES) . '" style="display:inline-block;margin-left:8px;background:transparent;color:#FF6B00;font-size:13px;font-weight:bold;text-decoration:none;padding:11px 20px;border-radius:10px;border:1px solid rgba(255,107,0,0.4)">📍 Track live</a>'
+                : '')
             . '</div>'
             . '<p style="color:rgba(245,245,245,0.3);font-size:12px;line-height:1.5;margin:22px 0 0">Need help? Just reply to this email and our team will assist you.</p>'
             . '</div></div></div>';
 
-        return mm_send_mail($email, $subject, $html);
+        return mm_send_mail($email, $subject, $html, [
+            'from'     => MAIL_ORDER_FROM,
+            'fromName' => MAIL_ORDER_FROM_NAME,
+            'replyTo'  => MAIL_ORDER_FROM,
+        ]);
     }
 
     /**
@@ -296,7 +320,13 @@ if (!function_exists('mm_send_mail')) {
             . '<div style="margin:20px 0 0"><a href="' . htmlspecialchars($adminLink, ENT_QUOTES) . '" style="display:inline-block;background:#FF6B00;color:#fff;font-size:13px;font-weight:bold;text-decoration:none;padding:11px 22px;border-radius:10px">Open admin panel</a></div>'
             . '</div></div></div>';
 
-        return mm_send_mail($to, $subject, $html);
+        // Sent from ordersupport@; reply-to is the customer so admin can reply directly.
+        $custEmail = (string)($o['customer_email'] ?? $o['email'] ?? '');
+        return mm_send_mail($to, $subject, $html, [
+            'from'     => MAIL_ORDER_FROM,
+            'fromName' => MAIL_ORDER_FROM_NAME,
+            'replyTo'  => filter_var($custEmail, FILTER_VALIDATE_EMAIL) ? $custEmail : MAIL_ORDER_FROM,
+        ]);
     }
 }
 

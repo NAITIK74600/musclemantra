@@ -34,9 +34,18 @@ define('ADMIN_KEY', mm_env('ADMIN_KEY', 'Amarjeetmuscle@321'));
 define('DELIVERY_KEY', mm_env('DELIVERY_KEY', 'muscle-rider-2025'));
 
 // ── Email ─────────────────────────────────────────────────────────────────
-define('MAIL_FROM',      mm_env('MAIL_FROM',      'noreply@musclemantra.shop'));
+// Three mailboxes, each with a clear job:
+//   • noreply@       → OTP / login / password emails   (default sender)
+//   • ordersupport@  → order confirmations & updates    (order sender + reply-to)
+//   • admin@         → internal new-order alerts land here
+// All are sent through the ONE authenticated SMTP account (SMTP_USER, below).
+define('MAIL_FROM',      mm_env('MAIL_FROM',      'noreply@musclemantra.shop'));      // auth / OTP sender
 define('MAIL_FROM_NAME', mm_env('MAIL_FROM_NAME', 'Muscle Mantra'));
-define('MAIL_REPLY_TO',  mm_env('MAIL_REPLY_TO',  'ordersupport@musclemantra.shop'));
+define('MAIL_REPLY_TO',  mm_env('MAIL_REPLY_TO',  'noreply@musclemantra.shop'));      // default reply-to
+
+// Order emails are sent "from" this friendly support mailbox.
+define('MAIL_ORDER_FROM',      mm_env('MAIL_ORDER_FROM',      'ordersupport@musclemantra.shop'));
+define('MAIL_ORDER_FROM_NAME', mm_env('MAIL_ORDER_FROM_NAME', 'Muscle Mantra Orders'));
 
 // Where internal alerts (new orders etc.) are sent.
 define('ADMIN_NOTIFY_EMAIL', mm_env('ADMIN_NOTIFY_EMAIL', 'admin@musclemantra.shop'));
