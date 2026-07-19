@@ -46,6 +46,16 @@ export const metadata: Metadata = {
   publisher: "Muscle Mantra",
   category: "Health & Fitness",
 
+  // Favicon / browser-tab & app icons (Muscle Mantra gold logo)
+  icons: {
+    icon: [
+      { url: "/logo.png", type: "image/png", sizes: "any" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    shortcut: ["/logo.png"],
+    apple: [{ url: "/logo.png", sizes: "180x180", type: "image/png" }],
+  },
+
   // Google Search Console verification
   verification: {
     google: "ceec13777cf24feb",
