@@ -1,0 +1,53 @@
+﻿<?php
+require_once __DIR__ . "/db.php";
+apiInit(["GET"]);
+$db = getDB();
+
+// Admin: return all orders
+$adminKey = $_SERVER["HTTP_X_ADMIN_KEY"] ?? "";
+if ($adminKey && hash_equals(ADMIN_KEY, $adminKey)) {
+    $limit  = min((int)($_GET["limit"]  ?? 100), 500);
+    $offset = (int)($_GET["offset"] ?? 0);
+    $st = $db->prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT ? OFFSET ?");
+    $st->execute([$limit, $offset]);
+    $orders = $st->fetchAll();
+    foreach ($orders as &$o) {
+        $o["items"] = json_decode($o["items"] ?? "[]", true) ?? [];
+        $o["total"] = (float)$o["total"];
+    }
+    ok($orders);
+}
+
+// User: collect IDs from query string + auth session
+$ids = [];
+if (!empty($_GET["ids"])) {
+    foreach (explode(",", $_GET["ids"]) as $id) {
+        $c = preg_replace("/[^A-Za-z0-9]/", "", trim($id));
+        if ($c) $ids[] = $c;
+    }
+    $ids = array_slice(array_unique($ids), 0, 50);
+}
+
+$token = bearerToken();
+if ($token) {
+    $su = $db->prepare("SELECT u.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>NOW() LIMIT 1");
+    $su->execute([$token]);
+    $u = $su->fetch();
+    if ($u) {
+        $so = $db->prepare("SELECT id FROM orders WHERE user_id = ?");
+        $so->execute([$u["id"]]);
+        foreach ($so->fetchAll() as $row) $ids[] = $row["id"];
+        $ids = array_unique($ids);
+    }
+}
+
+if (!$ids) { ok([]); }
+$ph = implode(",", array_fill(0, count($ids), "?"));
+$st = $db->prepare("SELECT * FROM orders WHERE id IN ($ph) ORDER BY created_at DESC");
+$st->execute(array_values($ids));
+$orders = $st->fetchAll();
+foreach ($orders as &$o) {
+    $o["items"] = json_decode($o["items"] ?? "[]", true) ?? [];
+    $o["total"] = (float)$o["total"];
+}
+ok($orders);

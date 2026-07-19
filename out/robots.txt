@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Block admin and private paths
+Disallow: /admin/
+Disallow: /api/
+Disallow: /cart/
+Disallow: /checkout/
+Disallow: /account/
+Disallow: /orders/
+Disallow: /wishlist/
+Disallow: /data/
+
+# Sitemap
+Sitemap: https://musclemantra.shop/sitemap.xml
