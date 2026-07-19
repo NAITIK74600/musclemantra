@@ -74,56 +74,19 @@ const inventory = [
 ];
 
 // ── Customers ──────────────────────────────────────────────
-const customers = [
-  { name: 'Rohit Sharma', email: 'rohit.sharma@gmail.com', orders: 24, spent: '₹48,230', status: 'vip', joined: 'Jan 2024' },
-  { name: 'Priya Mehta', email: 'priya.m@gmail.com', orders: 12, spent: '₹21,540', status: 'active', joined: 'Feb 2024' },
-  { name: 'Arjun Singh', email: 'arjun.s@outlook.com', orders: 8, spent: '₹14,990', status: 'active', joined: 'Mar 2024' },
-  { name: 'Kavya R.', email: 'kavya.r@gmail.com', orders: 31, spent: '₹62,110', status: 'vip', joined: 'Dec 2023' },
-  { name: 'Amit Kumar', email: 'amit.k@yahoo.com', orders: 3, spent: '₹4,870', status: 'new', joined: 'May 2024' },
-  { name: 'Sneha Patel', email: 'sneha.p@gmail.com', orders: 17, spent: '₹33,200', status: 'active', joined: 'Jan 2024' },
-];
+type DemoCustomer = { name: string; email: string; orders: number; spent: string; status: string; joined: string };
+type DemoVendor   = { name: string; contact: string; products: number; status: string };
+type DemoCoupon   = { code: string; desc: string; value: string; used: number; limit: number; status: string };
+type DemoReview   = { product: string; customer: string; rating: number; comment: string; status: string };
+type DemoTicket   = { id: string; customer: string; subject: string; priority: string; status: string; date: string };
+type DemoCmsPage  = { title: string; type: string; updated: string; status: string };
 
-// ── Vendors ────────────────────────────────────────────────
-const vendors = [
-  { name: 'Optimum Nutrition India', contact: 'supply@on-india.com', products: 42, status: 'active' },
-  { name: 'MuscleBlaze Distribution', contact: 'orders@mb-dist.in', products: 78, status: 'active' },
-  { name: 'Dymatize Wholesale', contact: 'b2b@dymatize.in', products: 23, status: 'active' },
-  { name: 'Cellucor Imports', contact: 'india@cellucor.com', products: 16, status: 'pending' },
-];
-
-// ── Coupons ────────────────────────────────────────────────
-const coupons = [
-  { code: 'WELCOME15', desc: '15% off first order', value: '15%', used: 342, limit: 1000, status: 'active' },
-  { code: 'BULK500', desc: '₹500 off above ₹3000', value: '₹500', used: 128, limit: 500, status: 'active' },
-  { code: 'PROTEIN10', desc: '10% off all protein', value: '10%', used: 891, limit: 1000, status: 'active' },
-  { code: 'FLAT20', desc: '20% off sitewide', value: '20%', used: 500, limit: 500, status: 'expired' },
-];
-
-// ── Reviews ────────────────────────────────────────────────
-const reviews = [
-  { product: 'ON Whey Protein 2kg', customer: 'Rohit Sharma', rating: 5, comment: 'Authentic product, mixes well. Fast delivery!', status: 'approved' },
-  { product: 'MB Creatine 300g', customer: 'Priya Mehta', rating: 4, comment: 'Good quality, no taste. Works as expected.', status: 'pending' },
-  { product: 'C4 Pre-Workout', customer: 'Arjun Singh', rating: 5, comment: 'Great pump and energy. Will reorder.', status: 'pending' },
-  { product: 'Mass Gainer 6kg', customer: 'Kavya R.', rating: 3, comment: 'Decent but too sweet for me.', status: 'approved' },
-];
-
-// ── Support tickets ────────────────────────────────────────
-const tickets = [
-  { id: '#TK-1042', customer: 'Amit Kumar', subject: 'Order not delivered yet', priority: 'high', status: 'open', date: '15 May' },
-  { id: '#TK-1041', customer: 'Sneha Patel', subject: 'Wrong flavour received', priority: 'medium', status: 'open', date: '15 May' },
-  { id: '#TK-1040', customer: 'Rohit Sharma', subject: 'Request invoice copy', priority: 'low', status: 'resolved', date: '14 May' },
-  { id: '#TK-1039', customer: 'Priya Mehta', subject: 'Refund status query', priority: 'medium', status: 'open', date: '13 May' },
-  { id: '#TK-1038', customer: 'Kavya R.', subject: 'Damaged packaging', priority: 'high', status: 'resolved', date: '12 May' },
-];
-
-// ── CMS pages ──────────────────────────────────────────────
-const cmsPages = [
-  { title: 'Homepage Hero Banner', type: 'Banner', updated: '14 May 2024', status: 'published' },
-  { title: 'About Us', type: 'Page', updated: '02 May 2024', status: 'published' },
-  { title: 'Terms & Conditions', type: 'Page', updated: '28 Apr 2024', status: 'published' },
-  { title: 'Summer Sale Promo', type: 'Banner', updated: '10 May 2024', status: 'draft' },
-  { title: 'Shipping Policy', type: 'Page', updated: '15 Apr 2024', status: 'published' },
-];
+const initialCustomers: DemoCustomer[] = [];
+const initialVendors:   DemoVendor[]   = [];
+const initialCoupons:   DemoCoupon[]   = [];
+const initialReviews:   DemoReview[]   = [];
+const initialTickets:   DemoTicket[]   = [];
+const cmsPages:         DemoCmsPage[]  = [];
 
 /* ── Change Admin Password (embedded in Settings section) ──────────────── */
 function AdminPasswordChange({ adminEmail }: { adminEmail: string }) {
@@ -311,6 +274,15 @@ function AdminDashboard() {
   const adminEmail = getAdminEmail() ?? 'admin';
   const [owner, setOwner] = useState(false);
   useEffect(() => { setOwner(isAdminOwner()); }, []);
+
+  // ── Demo-data sections (client-side manage / delete) ─────────────────────
+  const [customerList, setCustomerList] = useState(initialCustomers);
+  const [vendorList, setVendorList]     = useState(initialVendors);
+  const [couponList, setCouponList]     = useState(initialCoupons);
+  const [reviewList, setReviewList]     = useState(initialReviews);
+  const [ticketList, setTicketList]     = useState(initialTickets);
+  const [replyTicket, setReplyTicket]   = useState<(typeof initialTickets)[number] | null>(null);
+  const [replyText, setReplyText]       = useState('');
   const [toggles, setToggles] = useState({
     cod: true, onlinePay: true, sameDay: true, lowStockAlerts: true, reviews: false, maintenance: false,
   });
@@ -382,6 +354,51 @@ function AdminDashboard() {
     setOrderList(prev => prev.map(o => o.id === id ? { ...o, status } : o));
     toast.push({ variant: 'success', title: `Order updated: ${status}` });
   }, [ADMIN_KEY_VAL, toast]);
+
+  const deleteOrder = useCallback(async (id: string) => {
+    if (!confirm(`Delete order #${id}? This permanently removes it.`)) return;
+    try {
+      const res = await fetch('/api/delete-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        setOrderList(prev => prev.filter(o => o.id !== id));
+        toast.push({ variant: 'info', title: 'Order deleted' });
+      } else {
+        toast.push({ variant: 'error', title: 'Could not delete order' });
+      }
+    } catch {
+      toast.push({ variant: 'error', title: 'Network error while deleting' });
+    }
+  }, [ADMIN_KEY_VAL, toast]);
+
+  const sendTicketReply = () => {
+    if (!replyTicket) return;
+    if (!replyText.trim()) { toast.push({ variant: 'error', title: 'Type a reply first' }); return; }
+    setTicketList(prev => prev.map(t => t.id === replyTicket.id ? { ...t, status: 'resolved' } : t));
+    toast.push({ variant: 'success', title: `Reply sent to ${replyTicket.customer}`, description: 'Ticket marked resolved.' });
+    setReplyTicket(null);
+    setReplyText('');
+  };
+
+  // Load persisted store settings on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('mb_admin_settings');
+      if (raw) setToggles(prev => ({ ...prev, ...JSON.parse(raw) }));
+    } catch { /* ignore */ }
+  }, []);
+
+  const saveSettings = () => {
+    try {
+      localStorage.setItem('mb_admin_settings', JSON.stringify(toggles));
+      toast.push({ variant: 'success', title: 'Settings saved', description: toggles.maintenance ? 'Maintenance mode is ON.' : 'Preferences updated.' });
+    } catch {
+      toast.push({ variant: 'error', title: 'Could not save settings' });
+    }
+  };
 
   const filteredOrders = useMemo(() => {
     let list = orderList;
@@ -1340,10 +1357,16 @@ function AdminDashboard() {
                           </td>
                           <td className="px-4 py-3 text-[rgba(245,245,245,0.4)] text-[11px] whitespace-nowrap">{date}</td>
                           <td className="px-4 py-3">
-                            <a href={`/invoice/${o.id}`} target="_blank" rel="noreferrer"
-                              className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all inline-flex">
-                              <Eye size={13} />
-                            </a>
+                            <div className="flex items-center gap-1">
+                              <a href={`/invoice/${o.id}`} target="_blank" rel="noreferrer"
+                                className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all inline-flex">
+                                <Eye size={13} />
+                              </a>
+                              <button onClick={() => deleteOrder(o.id)} title="Delete order"
+                                className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all">
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1460,7 +1483,7 @@ function AdminDashboard() {
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Customers</h2>
-                  <p className="text-[rgba(245,245,245,0.4)] text-sm mt-0.5">3,456 total customers</p>
+                  <p className="text-[rgba(245,245,245,0.4)] text-sm mt-0.5">{customerList.length} total customer{customerList.length !== 1 ? 's' : ''}</p>
                 </div>
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[rgba(245,245,245,0.35)]" />
@@ -1478,7 +1501,10 @@ function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {customers.map(c => (
+                      {customerList.length === 0 && (
+                        <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-[rgba(245,245,245,0.3)]">No customers yet.</td></tr>
+                      )}
+                      {customerList.map(c => (
                         <tr key={c.email} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-white/[0.02] transition-colors">
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
@@ -1494,7 +1520,8 @@ function AdminDashboard() {
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${c.status === 'vip' ? 'bg-[rgba(255,107,0,0.15)] text-[#FF6B00] border-[rgba(255,107,0,0.2)]' : c.status === 'new' ? 'bg-blue-500/15 text-blue-400 border-blue-500/20' : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'}`}>{c.status}</span>
                           </td>
                           <td className="px-5 py-3.5">
-                            <button className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-white hover:bg-white/5 rounded-lg transition-all"><Eye size={13} /></button>
+                            <button onClick={() => setCustomerList(prev => prev.filter(x => x.email !== c.email))}
+                              className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={13} /></button>
                           </td>
                         </tr>
                       ))}
@@ -1513,7 +1540,10 @@ function AdminDashboard() {
                 <button className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Plus size={15} /> Add Vendor</button>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
-                {vendors.map(v => (
+                {vendorList.length === 0 && (
+                  <p className="sm:col-span-2 text-center text-sm text-[rgba(245,245,245,0.3)] py-12">No vendors yet.</p>
+                )}
+                {vendorList.map(v => (
                   <div key={v.name} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
@@ -1527,7 +1557,8 @@ function AdminDashboard() {
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-[rgba(255,255,255,0.06)]">
                       <span className="text-[12px] text-[rgba(245,245,245,0.5)]"><span className="text-white font-bold">{v.products}</span> products supplied</span>
-                      <button className="text-[12px] text-[#FF6B00] font-bold flex items-center gap-1">Manage <ChevronRight size={13} /></button>
+                      <button onClick={() => setVendorList(prev => prev.filter(x => x.name !== v.name))}
+                        className="flex items-center gap-1.5 text-[12px] text-red-400 font-bold hover:bg-red-500/10 px-2.5 py-1 rounded-lg transition-all"><Trash2 size={13} /> Remove</button>
                     </div>
                   </div>
                 ))}
@@ -1601,7 +1632,10 @@ function AdminDashboard() {
                 <button className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Plus size={15} /> Create Coupon</button>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
-                {coupons.map(c => (
+                {couponList.length === 0 && (
+                  <p className="sm:col-span-2 text-center text-sm text-[rgba(245,245,245,0.3)] py-12">No coupons yet.</p>
+                )}
+                {couponList.map(c => (
                   <div key={c.code} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
@@ -1624,7 +1658,7 @@ function AdminDashboard() {
                     </div>
                     <div className="flex gap-2 pt-3 border-t border-[rgba(255,255,255,0.06)]">
                       <button className="flex-1 py-2 text-[12px] text-[rgba(245,245,245,0.6)] hover:text-white border border-[rgba(255,255,255,0.1)] rounded-lg transition-all flex items-center justify-center gap-1.5"><Edit2 size={12} /> Edit</button>
-                      <button className="py-2 px-3 text-[12px] text-red-400 hover:bg-red-500/10 border border-red-500/20 rounded-lg transition-all"><Trash2 size={12} /></button>
+                      <button onClick={() => setCouponList(prev => prev.filter(x => x.code !== c.code))} className="py-2 px-3 text-[12px] text-red-400 hover:bg-red-500/10 border border-red-500/20 rounded-lg transition-all"><Trash2 size={12} /></button>
                     </div>
                   </div>
                 ))}
@@ -1637,7 +1671,10 @@ function AdminDashboard() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
               <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Product Reviews</h2>
               <div className="space-y-3">
-                {reviews.map((r, i) => (
+                {reviewList.length === 0 && (
+                  <p className="text-center text-sm text-[rgba(245,245,245,0.3)] py-12">No reviews yet.</p>
+                )}
+                {reviewList.map((r, i) => (
                   <div key={i} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                       <div className="flex-1 min-w-[200px]">
@@ -1655,9 +1692,9 @@ function AdminDashboard() {
                       <div className="flex items-center gap-2">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${r.status === 'approved' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/20'}`}>{r.status}</span>
                         {r.status === 'pending' && (
-                          <button className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-all"><Check size={15} /></button>
+                          <button onClick={() => setReviewList(prev => prev.map((x, j) => j === i ? { ...x, status: 'approved' } : x))} className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-all"><Check size={15} /></button>
                         )}
-                        <button className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={14} /></button>
+                        <button onClick={() => setReviewList(prev => prev.filter((_, j) => j !== i))} className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={14} /></button>
                       </div>
                     </div>
                   </div>
@@ -1671,7 +1708,7 @@ function AdminDashboard() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Support Tickets</h2>
-                <span className="px-3 py-1.5 bg-[rgba(255,107,0,0.15)] text-[#FF6B00] text-[11px] font-bold rounded-lg">3 open</span>
+                <span className="px-3 py-1.5 bg-[rgba(255,107,0,0.15)] text-[#FF6B00] text-[11px] font-bold rounded-lg">{ticketList.filter(t => t.status === 'open').length} open</span>
               </div>
               <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden">
                 <div className="overflow-x-auto">
@@ -1684,7 +1721,10 @@ function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {tickets.map(t => (
+                      {ticketList.length === 0 && (
+                        <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-[rgba(245,245,245,0.3)]">No support tickets.</td></tr>
+                      )}
+                      {ticketList.map(t => (
                         <tr key={t.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-white/[0.02] transition-colors">
                           <td className="px-5 py-3.5 text-[#FF6B00] text-[12px] font-bold">{t.id}</td>
                           <td className="px-5 py-3.5 text-white text-[12px]">{t.customer}</td>
@@ -1697,7 +1737,12 @@ function AdminDashboard() {
                           </td>
                           <td className="px-5 py-3.5 text-[rgba(245,245,245,0.4)] text-[12px]">{t.date}</td>
                           <td className="px-5 py-3.5">
-                            <button className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all"><MessageSquare size={13} /></button>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => { setReplyTicket(t); setReplyText(''); }} title="Reply"
+                                className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all"><MessageSquare size={13} /></button>
+                              <button onClick={() => setTicketList(prev => prev.filter(x => x.id !== t.id))} title="Delete"
+                                className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={13} /></button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1725,6 +1770,9 @@ function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
+                    {cmsPages.length === 0 && (
+                      <tr><td colSpan={5} className="px-5 py-12 text-center text-sm text-[rgba(245,245,245,0.3)]">No content pages yet.</td></tr>
+                    )}
                     {cmsPages.map(c => (
                       <tr key={c.title} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-white/[0.02] transition-colors">
                         <td className="px-5 py-3.5">
@@ -1805,7 +1853,7 @@ function AdminDashboard() {
               </div>
 
               <div className="flex justify-end">
-                <button className="flex items-center gap-2 px-6 py-3 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Save size={15} /> Save Changes</button>
+                <button onClick={saveSettings} className="flex items-center gap-2 px-6 py-3 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Save size={15} /> Save Changes</button>
               </div>
             </motion.div>
           )}
@@ -2022,6 +2070,36 @@ function AdminDashboard() {
                   className="flex items-center gap-2 px-5 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all">
                   <Save size={14} /> Save product
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Support ticket reply modal */}
+      <AnimatePresence>
+        {replyTicket && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={() => setReplyTicket(null)}>
+            <motion.div initial={{ scale: 0.94, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.94, y: 12 }}
+              className="w-full max-w-lg bg-[#111] border border-[rgba(255,255,255,0.08)] rounded-2xl p-6 shadow-2xl"
+              onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-white text-lg">Reply to ticket</h3>
+                  <p className="text-[12px] text-[rgba(245,245,245,0.5)] mt-0.5">
+                    {replyTicket.id} · {replyTicket.customer} — <span className="text-[rgba(245,245,245,0.7)]">{replyTicket.subject}</span>
+                  </p>
+                </div>
+                <button onClick={() => setReplyTicket(null)} className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-white hover:bg-white/10 rounded-lg transition-all"><X size={16} /></button>
+              </div>
+              <textarea value={replyText} onChange={e => setReplyText(e.target.value)} rows={5}
+                placeholder="Type your reply to the customer…"
+                className="w-full bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-xl px-4 py-3 text-sm text-white placeholder-[rgba(245,245,245,0.3)] focus:outline-none focus:border-[#FF6B00] resize-none" />
+              <div className="flex items-center justify-end gap-2 mt-4">
+                <button onClick={() => setReplyTicket(null)} className="px-4 py-2.5 text-sm font-semibold text-[rgba(245,245,245,0.6)] hover:text-white transition-colors">Cancel</button>
+                <button onClick={sendTicketReply} className="flex items-center gap-2 px-5 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><MessageSquare size={15} /> Send reply</button>
               </div>
             </motion.div>
           </motion.div>
