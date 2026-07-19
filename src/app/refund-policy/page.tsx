@@ -92,7 +92,7 @@ export default function RefundPolicyPage() {
               </h2>
               <div className="space-y-4">
                 {[
-                  { step: '01', title: 'Contact Us Within 7 Days', desc: 'Email hello@musclemantra.in or call +91 84096 12737 within 7 days of delivery.' },
+                  { step: '01', title: 'Contact Us Within 7 Days', desc: 'Email admin@musclemantra.shop or call +91 84096 12737 within 7 days of delivery.' },
                   { step: '02', title: 'Provide Order Details', desc: 'Share your Order ID, the item(s) to be refunded, and clear photographs showing the issue.' },
                   { step: '03', title: 'Refund Approved', desc: 'Our team will review your request within 24–48 hours and notify you of the decision.' },
                   { step: '04', title: 'Receive Your Refund', desc: 'Once approved, the refund is processed to your original payment method within 5–7 business days.' },
@@ -159,7 +159,7 @@ export default function RefundPolicyPage() {
             <h3 className="font-[var(--font-montserrat)] font-bold text-white mb-2">Need Help With a Refund?</h3>
             <p className="text-sm text-[rgba(245,245,245,0.55)] mb-3">We&apos;re here to help — reach out to us directly:</p>
             <div className="flex flex-col gap-1.5 text-sm text-[rgba(245,245,245,0.6)]">
-              <p>Email: <a href="mailto:hello@musclemantra.in" className="text-[#FF6B00] hover:underline">hello@musclemantra.in</a></p>
+              <p>Email: <a href="mailto:admin@musclemantra.shop" className="text-[#FF6B00] hover:underline">admin@musclemantra.shop</a></p>
               <p>Phone: <a href="tel:+918409612737" className="text-[#FF6B00] hover:underline">+91 84096 12737</a> (Mon–Sat, 9 AM–8 PM)</p>
               <p>Address: Tejpartap Nagar, Vrindavan Colony, Anisabad, Patna – 800002, Bihar, India</p>
             </div>

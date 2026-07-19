@@ -11,7 +11,7 @@ const sections = [
     id: 'intro',
     title: '1. Introduction',
     content: (
-      <p>Muscle Mantra (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), operated by <strong className="text-white">Amarjeet Kumar</strong>, is committed to protecting your privacy. This Privacy Policy describes how we collect, use, disclose, and safeguard your information when you visit musclemantra.in and make purchases from us.</p>
+      <p>Muscle Mantra (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), operated by <strong className="text-white">Amarjeet Kumar</strong>, is committed to protecting your privacy. This Privacy Policy describes how we collect, use, disclose, and safeguard your information when you visit musclemantra.shop and make purchases from us.</p>
     ),
   },
   {
@@ -123,7 +123,7 @@ const sections = [
           <li>Opt out of marketing communications at any time</li>
           <li>Lodge a complaint with the relevant data protection authority</li>
         </ul>
-        <p className="mt-3">To exercise any of these rights, contact us at <a href="mailto:hello@musclemantra.in" className="text-[#FF6B00] hover:underline">hello@musclemantra.in</a>.</p>
+        <p className="mt-3">To exercise any of these rights, contact us at <a href="mailto:admin@musclemantra.shop" className="text-[#FF6B00] hover:underline">admin@musclemantra.shop</a>.</p>
       </>
     ),
   },
@@ -192,7 +192,7 @@ export default function PrivacyPolicyPage() {
             <p className="text-sm text-[rgba(245,245,245,0.55)] mb-3">For privacy-related requests or concerns, reach out to:</p>
             <div className="flex flex-col gap-1.5 text-sm text-[rgba(245,245,245,0.6)]">
               <p>Amarjeet Kumar — Muscle Mantra</p>
-              <p>Email: <a href="mailto:hello@musclemantra.in" className="text-[#FF6B00] hover:underline">hello@musclemantra.in</a></p>
+              <p>Email: <a href="mailto:admin@musclemantra.shop" className="text-[#FF6B00] hover:underline">admin@musclemantra.shop</a></p>
               <p>Address: Tejpartap Nagar, Vrindavan Colony, Anisabad, Patna – 800002, Bihar, India</p>
             </div>
           </div>

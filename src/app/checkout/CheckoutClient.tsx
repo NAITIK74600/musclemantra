@@ -166,7 +166,7 @@ export default function CheckoutClient() {
           amount: amountStr,
           productinfo,
           firstname: form.name.trim(),
-          email: form.email.trim() || 'customer@musclemantra.in',
+          email: form.email.trim() || 'customer@musclemantra.shop',
           udf1: form.phone.trim(),
         }),
       });
@@ -211,7 +211,7 @@ export default function CheckoutClient() {
         amount:      amountStr,
         productinfo,
         firstname:   form.name.trim(),
-        email:       form.email.trim() || 'customer@musclemantra.in',
+        email:       form.email.trim() || 'customer@musclemantra.shop',
         phone:       form.phone.trim(),
         surl:        `${siteUrl}/api/payu-return`,
         furl:        `${siteUrl}/api/payu-return`,

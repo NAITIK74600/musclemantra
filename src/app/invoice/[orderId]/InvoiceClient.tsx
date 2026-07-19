@@ -231,7 +231,7 @@ export default function InvoiceClient() {
           <div className="bg-[#0a0a0a] px-9 py-6 border-t border-[rgba(255,255,255,0.06)] text-center print:bg-gray-50 print:border-gray-200">
             <p className="text-xs text-[rgba(245,245,245,0.3)] print:text-gray-400">Thank you for shopping with Muscle Mantra!</p>
             <p className="text-[11px] text-[rgba(245,245,245,0.25)] mt-1 print:text-gray-400">
-              +91 84096 12737 &nbsp;•&nbsp; hello@musclemantra.in &nbsp;•&nbsp; musclemantra.shop
+              +91 84096 12737 &nbsp;•&nbsp; admin@musclemantra.shop &nbsp;•&nbsp; musclemantra.shop
             </p>
             <p className="text-[10px] text-[rgba(245,245,245,0.15)] mt-3 print:text-gray-300">
               Muscle Mantra • Patna, Bihar, India

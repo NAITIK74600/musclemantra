@@ -183,7 +183,7 @@ export default function AboutPage() {
                   <p className="text-[13px] text-[rgba(245,245,245,0.5)] mt-1">Founder &amp; Proprietor, Muscle Mantra</p>
                   <div className="mt-3 space-y-1.5 text-[13px] text-[rgba(245,245,245,0.55)]">
                     <p className="flex items-center gap-2"><Phone size={13} className="text-[#FF6B00]" /> <a href="tel:+918409612737" className="hover:text-[#FF6B00] transition-colors">+91 84096 12737</a></p>
-                    <p className="flex items-center gap-2"><Mail size={13} className="text-[#FF6B00]" /> <a href="mailto:hello@musclemantra.in" className="hover:text-[#FF6B00] transition-colors">hello@musclemantra.in</a></p>
+                    <p className="flex items-center gap-2"><Mail size={13} className="text-[#FF6B00]" /> <a href="mailto:admin@musclemantra.shop" className="hover:text-[#FF6B00] transition-colors">admin@musclemantra.shop</a></p>
                   </div>
                 </div>
               </div>

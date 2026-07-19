@@ -93,7 +93,7 @@ export default function CancellationPolicyPage() {
               <div className="grid sm:grid-cols-2 gap-4">
                 {[
                   { title: 'Call Us', value: '+91 84096 12737', sub: 'Fastest method — available 9 AM–8 PM', href: 'tel:+918409612737' },
-                  { title: 'Email Us', value: 'hello@musclemantra.in', sub: 'Include your Order ID in the subject', href: 'mailto:hello@musclemantra.in' },
+                  { title: 'Email Us', value: 'admin@musclemantra.shop', sub: 'Include your Order ID in the subject', href: 'mailto:admin@musclemantra.shop' },
                 ].map(({ title, value, sub, href }) => (
                   <a key={title} href={href} className="p-4 rounded-xl bg-[#111] border border-[rgba(255,255,255,0.07)] hover:border-[rgba(255,107,0,0.25)] transition-colors block">
                     <p className="text-[10px] font-bold tracking-widest uppercase text-[rgba(245,245,245,0.35)] mb-1">{title}</p>
@@ -143,7 +143,7 @@ export default function CancellationPolicyPage() {
             <p className="text-sm text-[rgba(245,245,245,0.55)] mb-3">Act fast — call us immediately for the quickest resolution:</p>
             <div className="flex flex-col gap-1.5 text-sm text-[rgba(245,245,245,0.6)]">
               <p>Phone: <a href="tel:+918409612737" className="text-[#FF6B00] hover:underline font-bold">+91 84096 12737</a> (Fastest)</p>
-              <p>Email: <a href="mailto:hello@musclemantra.in" className="text-[#FF6B00] hover:underline">hello@musclemantra.in</a></p>
+              <p>Email: <a href="mailto:admin@musclemantra.shop" className="text-[#FF6B00] hover:underline">admin@musclemantra.shop</a></p>
               <p>Address: Tejpartap Nagar, Vrindavan Colony, Anisabad, Patna – 800002, Bihar, India</p>
             </div>
           </div>

@@ -15,7 +15,7 @@ const sections = [
         <p>This website is operated by <strong className="text-white">Muscle Mantra</strong>.</p>
         <p className="mt-3">Owner &amp; Proprietor: <strong className="text-white">Amarjeet Kumar</strong></p>
         <p className="mt-1">Registered Address: <strong className="text-white">Tejpartap Nagar, Vrindavan Colony, Anisabad, Patna – 800002, Bihar, India</strong></p>
-        <p className="mt-1">Email: <a href="mailto:hello@musclemantra.in" className="text-[#FF6B00] hover:underline">hello@musclemantra.in</a></p>
+        <p className="mt-1">Email: <a href="mailto:admin@musclemantra.shop" className="text-[#FF6B00] hover:underline">admin@musclemantra.shop</a></p>
         <p className="mt-1">Phone: <a href="tel:+918409612737" className="text-[#FF6B00] hover:underline">+91 84096 12737</a></p>
       </>
     ),
@@ -24,7 +24,7 @@ const sections = [
     id: 'acceptance',
     title: '2. Acceptance of Terms',
     content: (
-      <p>By accessing or using musclemantra.in (the &quot;Website&quot;), you agree to be bound by these Terms &amp; Conditions, our <Link href="/privacy-policy" className="text-[#FF6B00] hover:underline">Privacy Policy</Link>, <Link href="/refund-policy" className="text-[#FF6B00] hover:underline">Refund Policy</Link>, and <Link href="/cancellation-policy" className="text-[#FF6B00] hover:underline">Cancellation Policy</Link>. If you do not agree, please discontinue use of the Website.</p>
+      <p>By accessing or using musclemantra.shop (the &quot;Website&quot;), you agree to be bound by these Terms &amp; Conditions, our <Link href="/privacy-policy" className="text-[#FF6B00] hover:underline">Privacy Policy</Link>, <Link href="/refund-policy" className="text-[#FF6B00] hover:underline">Refund Policy</Link>, and <Link href="/cancellation-policy" className="text-[#FF6B00] hover:underline">Cancellation Policy</Link>. If you do not agree, please discontinue use of the Website.</p>
     ),
   },
   {
@@ -151,7 +151,7 @@ export default function TermsPage() {
           {/* Operator highlight box */}
           <div className="mb-10 p-5 rounded-2xl bg-[rgba(255,107,0,0.08)] border border-[rgba(255,107,0,0.2)]">
             <p className="text-[13px] text-[rgba(245,245,245,0.7)] leading-relaxed">
-              <span className="font-bold text-white">This website is operated by Muscle Mantra.</span> These Terms &amp; Conditions govern your use of musclemantra.in and all transactions made through the platform. Please read them carefully before placing an order.
+              <span className="font-bold text-white">This website is operated by Muscle Mantra.</span> These Terms &amp; Conditions govern your use of musclemantra.shop and all transactions made through the platform. Please read them carefully before placing an order.
             </p>
           </div>
 
@@ -173,7 +173,7 @@ export default function TermsPage() {
             <h3 className="font-[var(--font-montserrat)] font-bold text-white mb-2">Questions?</h3>
             <p className="text-sm text-[rgba(245,245,245,0.55)] mb-3">If you have any questions about these Terms &amp; Conditions, contact us:</p>
             <div className="flex flex-col gap-1.5 text-sm text-[rgba(245,245,245,0.6)]">
-              <p>Email: <a href="mailto:hello@musclemantra.in" className="text-[#FF6B00] hover:underline">hello@musclemantra.in</a></p>
+              <p>Email: <a href="mailto:admin@musclemantra.shop" className="text-[#FF6B00] hover:underline">admin@musclemantra.shop</a></p>
               <p>Phone: <a href="tel:+918409612737" className="text-[#FF6B00] hover:underline">+91 84096 12737</a></p>
               <p>Address: Tejpartap Nagar, Vrindavan Colony, Anisabad, Patna – 800002, Bihar, India</p>
             </div>

@@ -1895,7 +1895,7 @@ function AdminDashboard() {
                 <div className="grid sm:grid-cols-2 gap-4">
                   {[
                     { label: 'Store Name', value: 'Muscle Mantra' },
-                    { label: 'Support Email', value: 'hello@musclemantra.in' },
+                    { label: 'Support Email', value: 'admin@musclemantra.shop' },
                     { label: 'Phone', value: '+91 84096 12737' },
                     { label: 'City', value: 'Patna, Bihar' },
                   ].map(f => (

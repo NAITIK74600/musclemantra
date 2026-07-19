@@ -1,4 +1,4 @@
-﻿import Link from 'next/link';
+import Link from 'next/link';
 import Image from 'next/image';
 import { MapPin, Phone, Mail } from 'lucide-react';
 
@@ -40,8 +40,8 @@ export default function Footer() {
               <a href="tel:+918409612737" className="inline-flex items-center gap-2 hover:text-[#FF6B00] transition-colors">
                 <Phone size={13} className="text-[#FF6B00]" /> +91 84096 12737
               </a>
-              <a href="mailto:hello@musclemantra.in" className="inline-flex items-center gap-2 hover:text-[#FF6B00] transition-colors">
-                <Mail size={13} className="text-[#FF6B00]" /> hello@musclemantra.in
+              <a href="mailto:admin@musclemantra.shop" className="inline-flex items-center gap-2 hover:text-[#FF6B00] transition-colors">
+                <Mail size={13} className="text-[#FF6B00]" /> admin@musclemantra.shop
               </a>
               <span className="inline-flex items-start gap-2">
                 <MapPin size={13} className="text-[#FF6B00] mt-0.5 shrink-0" />

@@ -200,7 +200,7 @@ export default function AdminGate({ children, onReady }: Props) {
                   autoComplete="username"
                   value={email}
                   onChange={e => { setEmail(e.target.value); setError(''); }}
-                  placeholder="admin@musclemantra.in"
+                  placeholder="admin@musclemantra.shop"
                   className="w-full px-4 py-3 bg-[#0a0a0a] border border-[rgba(255,255,255,0.08)] rounded-xl text-sm text-white placeholder:text-[rgba(245,245,245,0.2)] focus:border-[#FF6B00] focus:outline-none transition-colors"
                 />
               </div>

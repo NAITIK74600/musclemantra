@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -591,7 +591,7 @@ function MobileDrawerBody({ onClose }: { onClose: () => void }) {
       <div className="mt-6 p-4 rounded-2xl bg-[#111] border border-white/6">
         <p className="text-[10px] font-black tracking-[0.22em] uppercase text-[#FF6B00] mb-2">Need help?</p>
         <a href="tel:+918409612737" className="block text-[13px] font-bold text-white">+91 84096 12737</a>
-        <a href="mailto:hello@musclemantra.in" className="block text-[12px] text-white/60">hello@musclemantra.in</a>
+        <a href="mailto:admin@musclemantra.shop" className="block text-[12px] text-white/60">admin@musclemantra.shop</a>
       </div>
 
       {user && (
