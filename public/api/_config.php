@@ -46,6 +46,6 @@ define('MAX_BODY_BYTES', 64 * 1024); // 64 KB
 // Only DB_PASS needs to be filled. DB_NAME and DB_USER are pre-configured.
 define('DB_HOST', 'localhost');
 define('DB_PORT', '3306');
-define('DB_NAME', 'musclema_muscle');       // cPanel database name
-define('DB_USER', 'musclema_mmadmin');      // cPanel database user
+define('DB_NAME', 'musclema_store');        // cPanel database name
+define('DB_USER', 'musclema_admin');        // cPanel database user
 define('DB_PASS', 'PASTE_YOUR_DB_PASSWORD_HERE');  // ⚠ ONLY EDIT THIS LINE

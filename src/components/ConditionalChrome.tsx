@@ -20,7 +20,7 @@ export default function ConditionalChrome({ children }: { children: React.ReactN
   return (
     <>
       <Navbar />
-      <main className="flex-1 pt-[76px] sm:pt-[92px] lg:pt-[104px]">{children}</main>
+      <main className="flex-1 pt-[60px] sm:pt-[64px] lg:pt-[104px]">{children}</main>
       <Footer />
       <FloatingActions />
     </>

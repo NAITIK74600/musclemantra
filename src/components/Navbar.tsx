@@ -420,24 +420,30 @@ export default function Navbar() {
             </div>
 
             {/* Mobile icons */}
-            <div className="flex lg:hidden items-center gap-2 ml-auto">
-              <Link href="/cart" className="relative p-2 text-[rgba(245,245,245,0.6)] hover:text-white">
-                <ShoppingCart size={20} />
+            <div className="flex lg:hidden items-center gap-1">
+              <Link href="/wishlist" aria-label="Wishlist"
+                className="tap-target flex items-center justify-center rounded-lg text-[rgba(245,245,245,0.7)] hover:text-white hover:bg-white/5 transition-colors">
+                <Heart size={19} />
+              </Link>
+              <Link href="/cart" aria-label="Cart"
+                className="tap-target relative flex items-center justify-center rounded-lg text-[rgba(245,245,245,0.7)] hover:text-white hover:bg-white/5 transition-colors">
+                <ShoppingCart size={19} />
                 {totalItems > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#FF6B00] text-white text-[9px] font-bold rounded-full flex items-center justify-center">{totalItems}</span>
+                  <span className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 bg-[#FF6B00] text-white text-[9px] font-bold rounded-full flex items-center justify-center tabular-nums">{totalItems}</span>
                 )}
               </Link>
-              <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-[rgba(245,245,245,0.6)] hover:text-white">
+              <button onClick={() => setMobileOpen(!mobileOpen)} aria-label="Menu"
+                className="tap-target flex items-center justify-center rounded-lg text-[rgba(245,245,245,0.7)] hover:text-white hover:bg-white/5 transition-colors">
                 {mobileOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* â”€â”€ Row 2 â€“ Menu bar â”€â”€ */}
-        <div className="bg-[#111] border-b border-[rgba(255,255,255,0.05)]">
+        {/* â”€â”€ Row 2 â€“ Menu bar (desktop only) â”€â”€ */}
+        <div className="hidden lg:block bg-[#111] border-b border-[rgba(255,255,255,0.05)]">
           <div className="container-max">
-            <nav className="flex items-stretch overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            <nav className="flex items-stretch overflow-x-auto no-scrollbar">
               {menuLinks.map(link => (
                 <div key={link.label} className="relative"
                   onMouseEnter={() => link.sub && setHoveredMenu(link.label)}
@@ -465,23 +471,137 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer â€” full-featured navigation */}
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="fixed inset-0 z-40 bg-[#0a0a0a] pt-[104px] px-5 overflow-y-auto">
-            <nav className="py-4 flex flex-col gap-1">
-              {menuLinks.map(link => (
-                <Link key={link.label} href={link.href} onClick={() => setMobileOpen(false)}
-                  className={`px-4 py-3 text-sm font-bold tracking-wide rounded-xl transition-all text-[rgba(245,245,245,0.7)] hover:text-white hover:bg-white/5`}>
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
-          </motion.div>
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setMobileOpen(false)}
+              className="lg:hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
+              style={{ top: 60 }}
+            />
+            {/* Drawer */}
+            <motion.aside
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+              className="lg:hidden fixed top-[60px] right-0 bottom-0 z-50 w-[85%] max-w-[360px] bg-[#0a0a0a] border-l border-white/10 overflow-y-auto shadow-[-20px_0_60px_rgba(0,0,0,0.7)]"
+            >
+              <MobileDrawerBody onClose={() => setMobileOpen(false)} />
+            </motion.aside>
+          </>
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   MOBILE DRAWER BODY â€” quick actions, categories, primary nav, auth
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+function MobileDrawerBody({ onClose }: { onClose: () => void }) {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  useEffect(() => {
+    setUser(getCurrentUser());
+    return onAuthChange(() => setUser(getCurrentUser()));
+  }, []);
+
+  const primary = menuLinks.filter(l => !l.sub);
+  const catLink = menuLinks.find(l => l.sub);
+  const quick = [
+    { icon: Package, label: 'Orders',   href: '/orders'   },
+    { icon: Heart,   label: 'Wishlist', href: '/wishlist' },
+    { icon: Repeat,  label: 'Reorder',  href: '/account'  },
+    { icon: User,    label: 'Account',  href: '/account'  },
+  ];
+
+  return (
+    <div className="px-4 pb-8">
+      {/* User strip */}
+      {user ? (
+        <Link href="/account" onClick={onClose}
+          className="mt-4 flex items-center gap-3 p-3 rounded-2xl bg-gradient-to-br from-[rgba(255,107,0,0.14)] to-[rgba(255,107,0,0.04)] border border-[rgba(255,107,0,0.25)]">
+          <div className="w-11 h-11 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-sm font-black overflow-hidden shrink-0">
+            {(() => {
+              const a = safeAvatar(user.avatar);
+              return a
+                ? <img src={a} alt={user.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                : initials(user.name);
+            })()}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold text-white truncate">Hi, {user.name.split(' ')[0]} 👋</p>
+            <p className="text-[11px] text-white/50 truncate">{user.email}</p>
+          </div>
+        </Link>
+      ) : (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Link href="/login" onClick={onClose}
+            className="flex items-center justify-center gap-2 py-3 rounded-xl border border-white/12 text-white text-[13px] font-bold hover:bg-white/5">
+            <LogIn size={15} /> Login
+          </Link>
+          <Link href="/signup" onClick={onClose}
+            className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#FF6B00] hover:bg-[#E55A00] text-white text-[13px] font-bold">
+            <UserPlus size={15} /> Sign Up
+          </Link>
+        </div>
+      )}
+
+      {/* Quick actions grid */}
+      <div className="mt-5 grid grid-cols-4 gap-2">
+        {quick.map(q => (
+          <Link key={q.label} href={q.href} onClick={onClose}
+            className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-[#141414] border border-white/6 hover:border-[rgba(255,107,0,0.35)] transition-colors">
+            <q.icon size={18} className="text-[#FF6B00]" />
+            <span className="text-[10px] font-semibold text-white/70">{q.label}</span>
+          </Link>
+        ))}
+      </div>
+
+      {/* Categories */}
+      {catLink?.sub && (
+        <div className="mt-6">
+          <p className="text-[10px] font-black tracking-[0.22em] uppercase text-white/40 mb-2 px-1">Shop by category</p>
+          <div className="grid grid-cols-2 gap-2">
+            {catLink.sub.map(s => (
+              <Link key={s} href={`/products?category=${s.toLowerCase().replace(/\s+/g, '-')}`} onClick={onClose}
+                className="px-3 py-2.5 text-[12px] font-semibold text-white/75 rounded-lg bg-[#111] border border-white/6 hover:border-[rgba(255,107,0,0.35)] hover:text-white transition-colors">
+                {s}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Primary navigation */}
+      <div className="mt-6">
+        <p className="text-[10px] font-black tracking-[0.22em] uppercase text-white/40 mb-2 px-1">Navigate</p>
+        <nav className="flex flex-col gap-0.5">
+          {primary.map(l => (
+            <Link key={l.label} href={l.href} onClick={onClose}
+              className="px-3 py-3 rounded-lg text-[13px] font-bold tracking-wide text-white/80 hover:text-white hover:bg-white/5 transition-colors">
+              {l.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+
+      {/* Contact strip */}
+      <div className="mt-6 p-4 rounded-2xl bg-[#111] border border-white/6">
+        <p className="text-[10px] font-black tracking-[0.22em] uppercase text-[#FF6B00] mb-2">Need help?</p>
+        <a href="tel:+918409612737" className="block text-[13px] font-bold text-white">+91 84096 12737</a>
+        <a href="mailto:hello@musclemantra.in" className="block text-[12px] text-white/60">hello@musclemantra.in</a>
+      </div>
+
+      {user && (
+        <button
+          onClick={() => { signOut(); onClose(); }}
+          className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-colors"
+        >
+          <LogOut size={15} /> Log Out
+        </button>
+      )}
+    </div>
   );
 }

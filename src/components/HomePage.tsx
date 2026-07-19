@@ -77,7 +77,7 @@ function HeroSection() {
   }, []);
 
   return (
-    <section className="relative overflow-hidden" style={{ minHeight: '74vh' }}>
+    <section className="relative overflow-hidden" style={{ minHeight: 'min(88vh, 640px)' }}>
       {/* Sliding background images */}
       {HERO_IMAGES.map((src, i) => (
         <div key={src} className="absolute inset-0 transition-opacity duration-1000"
@@ -85,61 +85,64 @@ function HeroSection() {
       ))}
 
       {/* Legibility gradient â€” strong on the left, image clear on the right */}
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(5,5,5,0.92) 0%, rgba(5,5,5,0.78) 36%, rgba(5,5,5,0.2) 62%, transparent 78%)' }} />
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(5,5,5,0.94) 0%, rgba(5,5,5,0.8) 40%, rgba(5,5,5,0.28) 66%, transparent 82%)' }} />
+      {/* Mobile bottom-heavy vignette so text sits over darker area */}
+      <div className="absolute inset-0 md:hidden" style={{ background: 'linear-gradient(to bottom, rgba(5,5,5,0.55) 0%, rgba(5,5,5,0.4) 40%, rgba(5,5,5,0.85) 100%)' }} />
       <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#050505] to-transparent" />
 
       {/* Slide dots */}
-      <div className="absolute bottom-8 right-8 z-20 flex gap-2">
+      <div className="absolute bottom-6 right-5 sm:bottom-8 sm:right-8 z-20 flex gap-2">
         {HERO_IMAGES.map((_, i) => (
-          <button key={i} onClick={() => setActiveIdx(i)}
-            className={`w-2 h-2 rounded-full transition-all ${i === activeIdx ? 'bg-[#FF6B00] w-5' : 'bg-white/30 hover:bg-white/60'}`} />
+          <button key={i} onClick={() => setActiveIdx(i)} aria-label={`Slide ${i + 1}`}
+            className={`h-2 rounded-full transition-all ${i === activeIdx ? 'bg-[#FF6B00] w-6' : 'w-2 bg-white/30 hover:bg-white/60'}`} />
         ))}
       </div>
 
-      <div className="container-max relative z-10 py-10 md:py-16 lg:py-24">
-        <div style={{ minHeight: '54vh' }} className="flex items-center">
-          <div className="w-full lg:max-w-[52%]">
+      <div className="container-max relative z-10 py-10 sm:py-14 md:py-20">
+        <div className="min-h-[54vh] flex items-center">
+          <div className="w-full lg:max-w-[54%]">
 
             {/* Eyebrow trust line */}
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10">
+              className="inline-flex items-center gap-2 mb-5 sm:mb-6 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10">
               <CheckCircle2 size={13} className="text-[#FF6B00]" />
-              <span className="text-[11px] font-semibold text-white/90 tracking-wide">100% Authentic Â· Patna&apos;s Supplement Store</span>
+              <span className="text-[10.5px] sm:text-[11px] font-semibold text-white/90 tracking-wide">100% Authentic Â· Patna&apos;s Supplement Store</span>
             </motion.div>
 
             {/* Headline */}
             <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.6 }}
-              className="font-[var(--font-montserrat)] font-black uppercase leading-[0.95] tracking-tight mb-5 text-white"
-              style={{ fontSize: 'clamp(2.6rem, 5.5vw + 0.5rem, 5rem)' }}>
+              className="font-[var(--font-montserrat)] font-black uppercase leading-[0.95] tracking-tight mb-4 sm:mb-5 text-white"
+              style={{ fontSize: 'clamp(2.25rem, 5.4vw + 0.5rem, 5rem)' }}>
               Fuel Your<br />
               <span className="text-gradient">Strength</span>
             </motion.h1>
 
             {/* Subcopy */}
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
-              className="text-[rgba(245,245,245,0.7)] text-base md:text-lg mb-7 leading-relaxed max-w-md">
+              className="text-white/70 text-[14.5px] sm:text-base md:text-lg mb-6 sm:mb-7 leading-relaxed max-w-md">
               Genuine whey, creatine, pre-workout &amp; more from the brands you trust â€” delivered to your door in 30 minutes.
             </motion.p>
 
             {/* CTAs */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
-              className="flex flex-wrap items-center gap-3 mb-8">
+              className="flex flex-wrap items-center gap-2.5 sm:gap-3 mb-6 sm:mb-8">
               <Link href="/products"
-                className="group inline-flex items-center gap-2 px-7 py-3.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold rounded-xl text-sm tracking-wide uppercase transition-all hover:shadow-[0_8px_30px_rgba(255,107,0,0.4)]">
+                className="group inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold rounded-xl text-[12.5px] sm:text-sm tracking-wide uppercase transition-all hover:shadow-[0_8px_30px_rgba(255,107,0,0.4)]">
                 Shop Now
                 <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link href="/stack-builder"
-                className="inline-flex items-center gap-2 px-7 py-3.5 bg-white/5 backdrop-blur-md border border-white/15 text-white font-bold rounded-xl text-sm tracking-wide uppercase hover:bg-white/10 transition-all">
+                className="inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 bg-white/5 backdrop-blur-md border border-white/15 text-white font-bold rounded-xl text-[12.5px] sm:text-sm tracking-wide uppercase hover:bg-white/10 transition-all">
                 Build Your Stack
               </Link>
             </motion.div>
 
             {/* Inline trust chips */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}
-              className="flex flex-wrap items-center gap-x-6 gap-y-3 text-[13px] text-white/70">
-              <span className="flex items-center gap-2"><Truck size={15} className="text-[#FF6B00]" /> 30-min delivery</span>
-              <span className="flex items-center gap-2"><Shield size={15} className="text-[#FF6B00]" /> 100% genuine</span>
+              className="flex flex-wrap items-center gap-x-5 sm:gap-x-6 gap-y-2 text-[12.5px] sm:text-[13px] text-white/70">
+              <span className="flex items-center gap-1.5"><Truck size={15} className="text-[#FF6B00]" /> 30-min delivery</span>
+              <span className="flex items-center gap-1.5"><Shield size={15} className="text-[#FF6B00]" /> 100% genuine</span>
+              <span className="flex items-center gap-1.5"><Award size={15} className="text-[#FF6B00]" /> Top brands</span>
             </motion.div>
           </div>
         </div>
@@ -217,7 +220,7 @@ function CategoriesSection() {
         <Reveal>
           <SectionHeader eyebrow="Browse" title="Shop by" accent="Category" href="/products" />
         </Reveal>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 sm:gap-3">
           {visible.map((cat, i) => {
             const src = cat.image || catImages[i % catImages.length];
             // Uploaded data-URLs must skip Next/Image optimization.
@@ -225,19 +228,19 @@ function CategoriesSection() {
             return (
               <Reveal key={cat.id} delay={i * 0.04}>
                 <Link href={`/products?category=${cat.id}`}
-                  className="group block rounded-2xl bg-[#111] border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,107,0,0.4)] overflow-hidden transition-all duration-300">
+                  className="group block rounded-xl sm:rounded-2xl bg-[#111] border border-white/6 hover:border-[rgba(255,107,0,0.4)] overflow-hidden transition-all duration-300">
                   <div className="relative aspect-square overflow-hidden bg-[#1a1a1a] flex items-center justify-center"
                     style={{ background: cat.image ? undefined : `${cat.color}15` }}>
                     <Image src={src} alt={cat.label} fill unoptimized={isDataUrl}
-                      className="object-cover group-hover:scale-105 transition-transform duration-500" sizes="160px" />
+                      className="object-cover group-hover:scale-105 transition-transform duration-500" sizes="(max-width:640px) 33vw, (max-width:1024px) 25vw, 160px" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
                     {!cat.image && (
-                      <span aria-hidden className="absolute text-3xl opacity-30" style={{ color: cat.color }}>{cat.icon}</span>
+                      <span aria-hidden className="absolute text-2xl sm:text-3xl opacity-30" style={{ color: cat.color }}>{cat.icon}</span>
                     )}
                   </div>
-                  <div className="py-3 px-2 text-center">
-                    <p className="text-[12px] font-bold text-white leading-tight group-hover:text-[#FF6B00] transition-colors">{cat.label}</p>
-                    <p className="text-[10px] text-[rgba(245,245,245,0.4)] mt-0.5">{countFor(cat.id)} item{countFor(cat.id) === 1 ? '' : 's'}</p>
+                  <div className="py-2.5 sm:py-3 px-1.5 sm:px-2 text-center">
+                    <p className="text-[11.5px] sm:text-[12px] font-bold text-white leading-tight group-hover:text-[#FF6B00] transition-colors line-clamp-1">{cat.label}</p>
+                    <p className="text-[10px] text-white/40 mt-0.5">{countFor(cat.id)} item{countFor(cat.id) === 1 ? '' : 's'}</p>
                   </div>
                 </Link>
               </Reveal>
@@ -268,10 +271,10 @@ function useCountdown(targetSecs: number) {
 function TimeBlock({ value, label }: { value: string; label: string }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="w-11 h-11 rounded-lg bg-[#1a1a1a] border border-[rgba(255,107,0,0.2)] flex items-center justify-center">
-        <span className="font-[var(--font-montserrat)] font-black text-[#FF6B00] text-lg tabular-nums">{value}</span>
+      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg bg-[#1a1a1a] border border-[rgba(255,107,0,0.2)] flex items-center justify-center">
+        <span className="font-[var(--font-montserrat)] font-black text-[#FF6B00] text-[15px] sm:text-lg tabular-nums">{value}</span>
       </div>
-      <span className="text-[9px] text-[rgba(245,245,245,0.4)] mt-1 uppercase tracking-wide">{label}</span>
+      <span className="text-[9px] text-white/40 mt-1 uppercase tracking-wide">{label}</span>
     </div>
   );
 }
@@ -291,7 +294,7 @@ function FlashDealsSection() {
     <section className="py-10 md:py-16 lg:py-20 bg-[#050505]">
       <div className="container-max">
         <Reveal>
-          <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+          <div className="flex flex-wrap items-end justify-between gap-4 mb-6 sm:mb-8">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Flame size={16} className="text-[#FF6B00]" />
@@ -301,13 +304,13 @@ function FlashDealsSection() {
                 Flash <span className="text-[#FF6B00]">Deals</span>
               </h2>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[12px] text-[rgba(245,245,245,0.5)] hidden sm:block">Ends in</span>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="text-[11px] sm:text-[12px] text-white/50 hidden sm:block">Ends in</span>
+              <div className="flex items-end gap-1.5 sm:gap-2">
                 <TimeBlock value={h} label="Hrs" />
-                <span className="text-[#FF6B00] font-black text-lg pb-4">:</span>
+                <span className="text-[#FF6B00] font-black text-base sm:text-lg pb-4 sm:pb-5">:</span>
                 <TimeBlock value={m} label="Min" />
-                <span className="text-[#FF6B00] font-black text-lg pb-4">:</span>
+                <span className="text-[#FF6B00] font-black text-base sm:text-lg pb-4 sm:pb-5">:</span>
                 <TimeBlock value={s} label="Sec" />
               </div>
             </div>
@@ -403,8 +406,8 @@ function TopBrandsSection() {
         <div ref={trackRef} onScroll={handleScroll}
           onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}
           onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)}
-          className="flex gap-4 overflow-x-auto pb-4 cursor-grab active:cursor-grabbing"
-          style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
+          className="no-scrollbar fade-edges-x flex gap-3 sm:gap-4 overflow-x-auto pb-4 cursor-grab active:cursor-grabbing -mx-4 sm:mx-0 px-4 sm:px-0"
+          style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
           {brands.map((b, i) => {
             const realIdx = i % brandData.length;
             const isActive = realIdx === activeIdx && i < brandData.length + 1;
@@ -412,8 +415,8 @@ function TopBrandsSection() {
               <Link key={`${b.id}-${i}`} href={`/products?brand=${encodeURIComponent(b.name)}`}
                 onClick={() => { setActiveIdx(realIdx); scrollTo(realIdx); }}
                 draggable={false} style={{ scrollSnapAlign: 'start' }}
-                className="shrink-0 w-[116px] flex flex-col items-center gap-3 group select-none">
-                <div className={`w-[88px] h-[88px] rounded-full overflow-hidden flex items-center justify-center font-[var(--font-montserrat)] font-black text-lg border transition-all duration-300
+                className="shrink-0 w-[92px] sm:w-[116px] flex flex-col items-center gap-2.5 sm:gap-3 group select-none">
+                <div className={`w-[72px] h-[72px] sm:w-[88px] sm:h-[88px] rounded-full overflow-hidden flex items-center justify-center font-[var(--font-montserrat)] font-black text-base sm:text-lg border transition-all duration-300
                   ${isActive
                     ? 'bg-[rgba(255,107,0,0.12)] border-[#FF6B00] text-[#FF6B00] shadow-[0_0_24px_rgba(255,107,0,0.25)] scale-105'
                     : 'bg-[#141414] border-[rgba(255,255,255,0.08)] text-[rgba(245,245,245,0.55)] group-hover:border-[rgba(255,107,0,0.4)] group-hover:text-white'}`}>
@@ -421,7 +424,7 @@ function TopBrandsSection() {
                     ? <Image src={b.logo} alt={b.name} width={88} height={88} className="w-full h-full object-cover" unoptimized />
                     : b.short}
                 </div>
-                <span className={`text-[12px] font-semibold text-center leading-tight transition-colors ${isActive ? 'text-white' : 'text-[rgba(245,245,245,0.45)] group-hover:text-white'}`}>
+                <span className={`text-[11.5px] sm:text-[12px] font-semibold text-center leading-tight line-clamp-1 transition-colors ${isActive ? 'text-white' : 'text-[rgba(245,245,245,0.45)] group-hover:text-white'}`}>
                   {b.name}
                 </span>
               </Link>
@@ -460,15 +463,15 @@ function WhyChooseUs() {
           <SectionHeader eyebrow="Why Muscle Mantra" title="Built on" accent="Trust" />
         </Reveal>
 
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {points.map((pt, i) => (
             <Reveal key={pt.title} delay={i * 0.08}>
-              <div className="h-full p-6 rounded-2xl bg-[#111] border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,107,0,0.3)] transition-all duration-300">
-                <div className="w-12 h-12 rounded-xl bg-[rgba(255,107,0,0.1)] border border-[rgba(255,107,0,0.18)] flex items-center justify-center mb-4">
-                  <pt.icon size={22} className="text-[#FF6B00]" />
+              <div className="h-full p-5 sm:p-6 rounded-2xl bg-[#111] border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,107,0,0.3)] transition-all duration-300">
+                <div className="icon-chip icon-chip-md mb-3 sm:mb-4">
+                  <pt.icon size={20} className="text-[#FF6B00]" />
                 </div>
-                <h3 className="font-[var(--font-montserrat)] font-bold text-white text-lg mb-2">{pt.title}</h3>
-                <p className="text-[14px] text-[rgba(245,245,245,0.55)] leading-relaxed">{pt.desc}</p>
+                <h3 className="font-[var(--font-montserrat)] font-bold text-white text-[16px] sm:text-lg mb-1.5 sm:mb-2">{pt.title}</h3>
+                <p className="text-[13.5px] sm:text-[14px] text-white/55 leading-relaxed">{pt.desc}</p>
               </div>
             </Reveal>
           ))}
@@ -508,17 +511,17 @@ function NewsletterBand() {
   };
 
   return (
-    <section className="py-12 md:py-16 bg-[#050505]">
+    <section className="py-10 md:py-16 bg-[#050505]">
       <div className="container-max">
-        <div className="relative overflow-hidden rounded-2xl border border-[rgba(255,107,0,0.2)] bg-gradient-to-br from-[#160a02] via-[#0d0d0d] to-[#0d0d0d] px-6 py-8 md:px-10 md:py-9">
+        <div className="relative overflow-hidden rounded-2xl border border-[rgba(255,107,0,0.2)] bg-gradient-to-br from-[#160a02] via-[#0d0d0d] to-[#0d0d0d] px-5 py-7 sm:px-8 sm:py-8 md:px-10 md:py-9">
           <div className="absolute -top-16 -right-16 w-56 h-56 bg-[rgba(255,107,0,0.1)] rounded-full blur-3xl pointer-events-none" />
-          <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-5 sm:gap-6">
             <div className="max-w-md">
               <div className="flex items-center gap-2 mb-2">
-                <MapPin size={14} className="text-[#FF6B00]" />
-                <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-[#FF6B00]">Now serving Patna</span>
+                <MapPin size={13} className="text-[#FF6B00]" />
+                <span className="text-[10px] font-bold tracking-[0.22em] uppercase text-[#FF6B00]">Now serving Patna</span>
               </div>
-              <h2 className="font-[var(--font-montserrat)] font-black text-xl md:text-2xl text-white tracking-tight mb-1.5">
+              <h2 className="font-[var(--font-montserrat)] font-black text-[20px] sm:text-xl md:text-2xl text-white tracking-tight mb-1.5 leading-tight">
                 Get â‚¹200 off your first order
               </h2>
               <p className="text-[rgba(245,245,245,0.55)] text-sm">

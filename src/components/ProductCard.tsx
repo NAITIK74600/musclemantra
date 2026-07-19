@@ -86,25 +86,25 @@ export default function ProductCard({ product: p, index = 0 }: ProductCardProps)
       </div>
 
       {/* Body */}
-      <div className="p-3 flex flex-col flex-1">
-        <p className="text-[10px] font-bold text-[rgba(245,245,245,0.4)] uppercase tracking-wider mb-1 truncate">{p.brand}</p>
+      <div className="p-2.5 sm:p-3 flex flex-col flex-1">
+        <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-1 truncate">{p.brand}</p>
         <Link href={`/products/${p.id}`}>
-          <h3 className="text-[13px] font-semibold text-white line-clamp-2 leading-snug min-h-[34px] hover:text-[#FF6B00] transition-colors">{p.name}</h3>
+          <h3 className="text-[12.5px] sm:text-[13px] font-semibold text-white line-clamp-2 leading-snug min-h-[34px] hover:text-[#FF6B00] transition-colors">{p.name}</h3>
         </Link>
         <div className="mt-1.5 mb-2 flex items-center gap-0.5">
           {[...Array(5)].map((_, j) => (
-            <Star key={j} size={11} className={j < Math.floor(p.rating) ? 'text-[#FF6B00] fill-[#FF6B00]' : 'text-[rgba(245,245,245,0.18)]'} />
+            <Star key={j} size={11} className={j < Math.floor(p.rating) ? 'text-[#FF6B00] fill-[#FF6B00]' : 'text-white/20'} />
           ))}
-          <span className="text-[11px] text-[rgba(245,245,245,0.45)] ml-1">{p.rating}</span>
+          <span className="text-[11px] text-white/45 ml-1 tabular-nums">{p.rating}</span>
         </div>
-        <div className="flex items-baseline gap-1.5 mb-3 mt-auto">
-          <span className="text-[17px] font-black text-white">₹{p.price.toLocaleString()}</span>
+        <div className="flex items-baseline gap-1.5 mb-2.5 sm:mb-3 mt-auto">
+          <span className="text-[16px] sm:text-[17px] font-black text-white tabular-nums">₹{p.price.toLocaleString()}</span>
           {p.originalPrice > p.price && (
-            <span className="text-[11px] text-[rgba(245,245,245,0.35)] line-through">₹{p.originalPrice.toLocaleString()}</span>
+            <span className="text-[11px] text-white/35 line-through tabular-nums">₹{p.originalPrice.toLocaleString()}</span>
           )}
         </div>
         <button onClick={handleAdd}
-          className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-bold tracking-wide uppercase transition-colors ${added ? 'bg-emerald-600 text-white' : 'bg-[#FF6B00] hover:bg-[#E55A00] text-white'}`}>
+          className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[11.5px] sm:text-[12px] font-bold tracking-wide uppercase transition-colors ${added ? 'bg-emerald-600 text-white' : 'bg-[#FF6B00] hover:bg-[#E55A00] text-white'}`}>
           {added ? <><Check size={14} /> Added</> : <><ShoppingCart size={14} /> Add to Cart</>}
         </button>
       </div>
