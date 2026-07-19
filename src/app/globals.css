@@ -85,8 +85,8 @@ img {
 
 .container-max {
   max-width: 1536px;
-  margin: 0 auto;
-  padding: 0 clamp(1rem, 3vw, 2.5rem);
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 3vw, 2.5rem);
 }
 
 /* Shared product grid — guarantees every product card is the same fixed size
