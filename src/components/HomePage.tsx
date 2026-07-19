@@ -20,8 +20,16 @@ import { useToast } from './ToastProvider';
    SHARED DESIGN PRIMITIVES
    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/** Consistent reveal-on-scroll wrapper (opacity + translate only â€” GPU cheap) */
+/** Consistent reveal-on-scroll wrapper.
+ *  SEO-safe: server-rendered as plain visible <div>. Animation only runs
+ *  after client mount to keep initial HTML free of opacity:0 styles that
+ *  would look like hidden content to Google's crawler. */
 function Reveal({ children, className, delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) {
+    return <div className={className}>{children}</div>;
+  }
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -32,6 +40,35 @@ function Reveal({ children, className, delay = 0 }: { children: React.ReactNode;
       className={className}>
       {children}
     </motion.div>
+  );
+}
+
+/** Client-only motion wrapper — same SSR-safe pattern as Reveal but with configurable props.
+ *  Renders plain wrapper (or the given fallback element) during SSR + first paint,
+ *  then upgrades to framer-motion after hydration. Used for hero elements so Google
+ *  bot sees fully visible text on first fetch. */
+function ClientMotion({
+  as = 'div', className, style, children, initial, animate, transition,
+}: {
+  as?: 'div' | 'h1' | 'p';
+  className?: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+  initial?: Record<string, number>;
+  animate?: Record<string, number>;
+  transition?: Record<string, number | string>;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) {
+    const Tag = as as keyof React.JSX.IntrinsicElements;
+    return <Tag className={className} style={style}>{children}</Tag>;
+  }
+  const MotionTag = motion[as] as typeof motion.div;
+  return (
+    <MotionTag className={className} style={style} initial={initial} animate={animate} transition={transition}>
+      {children}
+    </MotionTag>
   );
 }
 
@@ -103,14 +140,14 @@ function HeroSection() {
           <div className="w-full lg:max-w-[54%]">
 
             {/* Eyebrow trust line */}
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
+            <ClientMotion initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
               className="inline-flex items-center gap-2 mb-5 sm:mb-6 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10">
               <CheckCircle2 size={13} className="text-[#FF6B00]" />
               <span className="text-[10.5px] sm:text-[11px] font-semibold text-white/90 tracking-wide">100% Authentic · Patna&apos;s Supplement Store</span>
-            </motion.div>
+            </ClientMotion>
 
             {/* Headline — H1 includes brand name "Muscle Mantra" so it matches OAuth app name */}
-            <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.6 }}
+            <ClientMotion as="h1" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.6 }}
               className="font-[var(--font-montserrat)] font-black uppercase leading-[0.95] tracking-tight mb-4 sm:mb-5 text-white">
               <span className="block text-[#FF6B00] text-[13px] sm:text-[14px] font-black tracking-[0.28em] mb-2 sm:mb-3">
                 MUSCLE MANTRA
@@ -119,16 +156,16 @@ function HeroSection() {
                 Fuel Your<br />
                 <span className="text-gradient">Strength</span>
               </span>
-            </motion.h1>
+            </ClientMotion>
 
             {/* Subcopy — clearly explains the app's purpose for OAuth verification */}
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
+            <ClientMotion as="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
               className="text-white/70 text-[14.5px] sm:text-base md:text-lg mb-6 sm:mb-7 leading-relaxed max-w-lg">
               <strong className="text-white/90 font-semibold">Muscle Mantra</strong> is India&apos;s trusted online supplement store. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA from top brands — delivered to your door.
-            </motion.p>
+            </ClientMotion>
 
             {/* CTAs */}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
+            <ClientMotion initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
               className="flex flex-wrap items-center gap-2.5 sm:gap-3 mb-6 sm:mb-8">
               <Link href="/products"
                 className="group inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold rounded-xl text-[12.5px] sm:text-sm tracking-wide uppercase transition-all hover:shadow-[0_8px_30px_rgba(255,107,0,0.4)]">
@@ -139,15 +176,15 @@ function HeroSection() {
                 className="inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 bg-white/5 backdrop-blur-md border border-white/15 text-white font-bold rounded-xl text-[12.5px] sm:text-sm tracking-wide uppercase hover:bg-white/10 transition-all">
                 Build Your Stack
               </Link>
-            </motion.div>
+            </ClientMotion>
 
             {/* Inline trust chips */}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}
+            <ClientMotion initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}
               className="flex flex-wrap items-center gap-x-5 sm:gap-x-6 gap-y-2 text-[12.5px] sm:text-[13px] text-white/70">
               <span className="flex items-center gap-1.5"><Truck size={15} className="text-[#FF6B00]" /> 30-min delivery</span>
               <span className="flex items-center gap-1.5"><Shield size={15} className="text-[#FF6B00]" /> 100% genuine</span>
               <span className="flex items-center gap-1.5"><Award size={15} className="text-[#FF6B00]" /> Top brands</span>
-            </motion.div>
+            </ClientMotion>
           </div>
         </div>
       </div>
