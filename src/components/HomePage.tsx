@@ -101,28 +101,6 @@ function SectionHeader({
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SEO / OAUTH INTRO BANNER
-   Plain HTML (no framer motion, no opacity tricks) — the very
-   first thing Google's crawler + OAuth verification bot sees.
-   Contains the app name, purpose, and explicit "no login" line.
-   ───────────────────────────────────────────────────────────── */
-function IntroBanner() {
-  return (
-    <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)]">
-      <div className="container-max py-2.5 sm:py-3">
-        <p className="text-center text-[11.5px] sm:text-[12.5px] text-white/70 leading-snug">
-          <strong className="text-[#FF6B00] font-bold">Muscle Mantra</strong>
-          <span className="text-white/40 mx-1.5">·</span>
-          <span>Online supplement store — buy authentic whey protein, creatine &amp; pre-workout.</span>
-          <span className="hidden sm:inline text-white/40 mx-1.5">·</span>
-          <span className="hidden sm:inline text-white/50">No login required to browse.</span>
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────
    HERO
    ───────────────────────────────────────────────────────────── */
 const HERO_IMAGES = ['/hero-1.jpg', '/hero-2.jpg'];
@@ -671,41 +649,13 @@ function PromoBanner() {
    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* ─────────────────────────────────────────────────────────────
-   ABOUT MUSCLE MANTRA — explicit purpose statement for OAuth
-   verification + SEO. Google's bot needs to see clear text
-   explaining what this website/app does.
-   ───────────────────────────────────────────────────────────── */
-function AboutStrip() {
-  return (
-    <section className="py-10 md:py-14 bg-[#0a0a0a] border-y border-[rgba(255,255,255,0.05)]">
-      <div className="container-max">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="eyebrow mb-4">About Muscle Mantra</div>
-          <h2 className="section-title mb-4">
-            India&apos;s trusted online <span className="text-[#FF6B00]">supplement store</span>
-          </h2>
-          <p className="text-white/65 text-[14.5px] sm:text-[15px] leading-relaxed">
-            <strong className="text-white">Muscle Mantra</strong> is an e-commerce platform based in Patna, Bihar, that sells authentic bodybuilding and fitness supplements online across India. Customers can browse, purchase, and get home delivery of <strong className="text-white/90">whey protein, creatine, pre-workout, mass gainer, BCAA, multivitamins, and fitness accessories</strong> from top brands like Optimum Nutrition, MuscleBlaze, GNC, and more — all 100% genuine and lab-verified.
-          </p>
-          <p className="text-white/50 text-[13.5px] sm:text-[14px] leading-relaxed mt-3">
-            Create a free account to save your cart, track orders, build supplement stacks, and get personalised nutrition recommendations. Sign in with Google or email — no login required to browse products.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────
    PAGE
    ───────────────────────────────────────────────────────────── */
 export default function HomePage() {
   return (
     <>
-      <IntroBanner />
       <HeroSection />
       <TrustStrip />
-      <AboutStrip />
       <CategoriesSection />
       <FlashDealsSection />
       <BestsellersSection />

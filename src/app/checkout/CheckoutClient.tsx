@@ -3,13 +3,15 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Banknote, Smartphone, CreditCard, Landmark, ShoppingBag,
   ChevronRight, CheckCircle, MapPin, User, Phone, Package,
-  Lock, ArrowLeft, Truck,
+  Lock, ArrowLeft, Truck, LogIn,
 } from 'lucide-react';
 import { useCart } from '@/components/CartProvider';
+import { getCurrentUser, getToken, onAuthChange, type User as AuthUser } from '@/lib/auth';
 
 type PaymentMethod = 'cod' | 'upi' | 'card' | 'netbanking';
 
@@ -85,15 +87,47 @@ function Field({
 }
 
 export default function CheckoutClient() {
+  const router = useRouter();
   const { items, totalPrice, clearCart } = useCart();
   const [step, setStep] = useState<'checkout' | 'success'>('checkout');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [orderId, setOrderId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [form, setForm] = useState<ShippingForm>({
     name: '', phone: '', email: '', address: '', area: '', city: 'Patna', state: 'Bihar', pincode: '',
   });
   const [errors, setErrors] = useState<Partial<ShippingForm>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  // ── Auth gate ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const u = getCurrentUser();
+    setAuthUser(u);
+    setAuthChecked(true);
+    if (u) {
+      setForm(f => ({
+        ...f,
+        name:  f.name  || u.name  || '',
+        email: f.email || u.email || '',
+        phone: f.phone || u.phone || '',
+      }));
+    }
+    const off = onAuthChange(() => {
+      const nu = getCurrentUser();
+      setAuthUser(nu);
+      if (nu) {
+        setForm(f => ({
+          ...f,
+          name:  f.name  || nu.name  || '',
+          email: f.email || nu.email || '',
+          phone: f.phone || nu.phone || '',
+        }));
+      }
+    });
+    return off;
+  }, []);
 
   // Pre-fill from localStorage (delivery area)
   useEffect(() => {
@@ -123,36 +157,75 @@ export default function CheckoutClient() {
 
   const placeOrder = async () => {
     if (!validate()) return;
+    if (!authUser) { router.push('/login?redirect=/checkout'); return; }
     setLoading(true);
+    setApiError(null);
 
     const txnid = 'MM' + Date.now().toString().slice(-8);
     const amountStr = finalTotal.toFixed(2);
     const productinfo = items.map(i => i.name).join(', ').slice(0, 100);
 
-    // ── COD flow (no PayU) ──────────────────────────────────────────────────
-    if (paymentMethod === 'cod') {
-      const orderData = {
-        id: txnid, items, shippingAddress: form, paymentMethod,
-        total: finalTotal, shipping, discount,
-        status: 'Confirmed — Pay on Delivery',
-        createdAt: new Date().toISOString(),
-      };
-      // Save to server (PHP API) — primary store
-      fetch('/api/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderData),
-      }).catch(() => {});
-      // Also cache order ID locally so user can view it on /orders
+    // Server payload — flat shape expected by PHP create-order.php
+    const orderPayload = (status: string) => ({
+      id: txnid,
+      name:  form.name.trim(),
+      email: form.email.trim() || authUser.email,
+      phone: form.phone.trim(),
+      address: {
+        line1:   form.address.trim(),
+        area:    form.area.trim(),
+        city:    form.city.trim(),
+        state:   form.state.trim(),
+        pincode: form.pincode.trim(),
+      },
+      items,
+      paymentMethod,
+      subtotal: totalPrice,
+      shipping,
+      discount,
+      total: finalTotal,
+      status,
+      createdAt: new Date().toISOString(),
+    });
+
+    const authHeaders = (): Record<string, string> => {
+      const h: Record<string, string> = { 'Content-Type': 'application/json' };
+      const t = getToken();
+      if (t) h['Authorization'] = `Bearer ${t}`;
+      return h;
+    };
+
+    const cacheOrderId = (id: string) => {
       try {
         const ids: string[] = JSON.parse(localStorage.getItem('mb_order_ids') || '[]');
-        ids.push(txnid);
+        ids.push(id);
         localStorage.setItem('mb_order_ids', JSON.stringify(ids));
       } catch { /* ignore */ }
-      clearCart();
-      setOrderId(txnid);
-      setLoading(false);
-      setStep('success');
+    };
+
+    // ── COD flow (no PayU) ──────────────────────────────────────────────────
+    if (paymentMethod === 'cod') {
+      try {
+        const res = await fetch('/api/create-order', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify(orderPayload('Confirmed — Pay on Delivery')),
+        });
+        const data = await res.json().catch(() => ({} as { error?: string }));
+        if (!res.ok) {
+          setLoading(false);
+          setApiError(data?.error || `Order failed (HTTP ${res.status}). Please try again.`);
+          return;
+        }
+        cacheOrderId(txnid);
+        clearCart();
+        setOrderId(txnid);
+        setLoading(false);
+        setStep('success');
+      } catch {
+        setLoading(false);
+        setApiError('Network error. Check your connection and try again.');
+      }
       return;
     }
 
@@ -166,7 +239,7 @@ export default function CheckoutClient() {
           amount: amountStr,
           productinfo,
           firstname: form.name.trim(),
-          email: form.email.trim() || 'customer@musclemantra.shop',
+          email: form.email.trim() || authUser.email,
           udf1: form.phone.trim(),
         }),
       });
@@ -175,31 +248,26 @@ export default function CheckoutClient() {
 
       if (!res.ok || !data.hash) {
         setLoading(false);
-        setErrors(e => ({ ...e, name: data.error ?? 'Payment gateway error. Please try COD.' }));
+        setApiError(data.error ?? 'Payment gateway error. Please try COD.');
         return;
       }
 
       // Save order info so success page can display it
       sessionStorage.setItem('mm_payu_order', JSON.stringify({ txnid, amount: amountStr }));
 
-      // Save pending order to server
-      const pendingOrder = {
-        id: txnid, items, shippingAddress: form, paymentMethod,
-        total: finalTotal, shipping, discount,
-        status: 'Payment Pending',
-        createdAt: new Date().toISOString(),
-      };
-      fetch('/api/create-order', {
+      // Save pending order to server — must succeed before redirecting to PayU
+      const saveRes = await fetch('/api/create-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pendingOrder),
-      }).catch(() => {});
-      // Cache order ID locally
-      try {
-        const ids: string[] = JSON.parse(localStorage.getItem('mb_order_ids') || '[]');
-        ids.push(txnid);
-        localStorage.setItem('mb_order_ids', JSON.stringify(ids));
-      } catch { /* ignore */ }
+        headers: authHeaders(),
+        body: JSON.stringify(orderPayload('Payment Pending')),
+      });
+      const saveData = await saveRes.json().catch(() => ({} as { error?: string }));
+      if (!saveRes.ok) {
+        setLoading(false);
+        setApiError(saveData?.error || 'Could not save order. Please try again.');
+        return;
+      }
+      cacheOrderId(txnid);
 
       clearCart();
 
@@ -211,7 +279,7 @@ export default function CheckoutClient() {
         amount:      amountStr,
         productinfo,
         firstname:   form.name.trim(),
-        email:       form.email.trim() || 'customer@musclemantra.shop',
+        email:       form.email.trim() || authUser.email,
         phone:       form.phone.trim(),
         surl:        `${siteUrl}/api/payu-return`,
         furl:        `${siteUrl}/api/payu-return`,
@@ -233,7 +301,7 @@ export default function CheckoutClient() {
 
     } catch {
       setLoading(false);
-      setErrors(e => ({ ...e, name: 'Network error. Please try again or use COD.' }));
+      setApiError('Network error. Please try again or use COD.');
     }
   };
 
@@ -247,6 +315,31 @@ export default function CheckoutClient() {
         <Link href="/products" className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B00] text-white font-bold rounded-xl hover:bg-[#E55A00] transition-all">
           <ShoppingBag size={16} /> Shop Now
         </Link>
+      </div>
+    );
+  }
+
+  /* ---- Login required ---- */
+  if (authChecked && !authUser && step !== 'success') {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 text-center py-20">
+        <div className="w-20 h-20 rounded-full bg-[rgba(255,107,0,0.12)] border-2 border-[#FF6B00] flex items-center justify-center mb-6">
+          <Lock size={32} className="text-[#FF6B00]" />
+        </div>
+        <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-[#FF6B00] mb-2">Login Required</p>
+        <h1 className="font-[var(--font-montserrat)] font-black text-2xl md:text-3xl text-white mb-3">Sign in to place your order</h1>
+        <p className="text-[rgba(245,245,245,0.55)] mb-7 text-sm max-w-sm">
+          Please log in or create a free account so we can track your order, send updates, and let you re-order easily.
+        </p>
+        <div className="flex gap-3 flex-wrap justify-center">
+          <Link href="/login?redirect=/checkout" className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold rounded-xl transition-all text-sm">
+            <LogIn size={16} /> Login
+          </Link>
+          <Link href="/signup?redirect=/checkout" className="inline-flex items-center gap-2 px-6 py-3 border border-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.3)] text-white font-bold rounded-xl transition-all text-sm">
+            Create Account
+          </Link>
+        </div>
+        <Link href="/cart" className="mt-6 text-[12px] text-[rgba(245,245,245,0.4)] hover:text-white transition-colors">← Back to cart</Link>
       </div>
     );
   }
@@ -480,6 +573,14 @@ export default function CheckoutClient() {
                   )}
                 </div>
               </div>
+
+              {/* API error banner */}
+              {apiError && (
+                <div className="mb-4 p-3.5 rounded-xl bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.28)] text-[13px] text-red-300 leading-snug">
+                  <p className="font-semibold text-red-200 mb-0.5">Order could not be placed</p>
+                  <p className="text-[12.5px]">{apiError}</p>
+                </div>
+              )}
 
               {/* Place order button */}
               <button

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -23,6 +23,15 @@ function GoogleIcon({ size = 18 }: { size?: number }) {
 export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const router = useRouter();
   const isLogin = mode === 'login';
+
+  // Read ?redirect= from URL after mount (avoids useSearchParams Suspense requirement in static export).
+  // Only allow same-site relative paths (starts with '/', no protocol / no '//').
+  const [redirectTo, setRedirectTo] = useState('/account');
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = new URLSearchParams(window.location.search).get('redirect') ?? '';
+    if (raw.startsWith('/') && !raw.startsWith('//')) setRedirectTo(raw);
+  }, []);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -49,7 +58,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         };
         const result = await signInWithGoogleProfile(profile);
         if (!result.ok) { setError(result.error || 'Google sign-in failed.'); return; }
-        router.push('/account');
+        router.push(redirectTo);
       } catch {
         setError('Google sign-in failed. Please try again.');
       } finally {
@@ -72,7 +81,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         setError(res.error || 'Something went wrong.');
         return;
       }
-      router.push('/account');
+      router.push(redirectTo);
     } finally {
       setLoading(false);
     }
