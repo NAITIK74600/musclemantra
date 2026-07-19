@@ -163,6 +163,183 @@ step('Create table: images', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
+// ── E-commerce catalog tables ────────────────────────────────────────────
+step('Create table: categories', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS categories (
+        id          VARCHAR(50)  NOT NULL PRIMARY KEY,
+        name        VARCHAR(100) NOT NULL,
+        slug        VARCHAR(100) NOT NULL UNIQUE,
+        icon        VARCHAR(20)  DEFAULT NULL,
+        color       VARCHAR(20)  DEFAULT '#FF6B00',
+        image_url   VARCHAR(500) DEFAULT NULL,
+        description TEXT         DEFAULT NULL,
+        sort_order  INT          NOT NULL DEFAULT 0,
+        is_active   TINYINT(1)   NOT NULL DEFAULT 1,
+        created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Create table: brands', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS brands (
+        id          VARCHAR(50)  NOT NULL PRIMARY KEY,
+        name        VARCHAR(100) NOT NULL,
+        slug        VARCHAR(100) NOT NULL UNIQUE,
+        logo_url    VARCHAR(500) DEFAULT NULL,
+        description TEXT         DEFAULT NULL,
+        website     VARCHAR(255) DEFAULT NULL,
+        country     VARCHAR(50)  DEFAULT NULL,
+        is_featured TINYINT(1)   NOT NULL DEFAULT 0,
+        is_active   TINYINT(1)   NOT NULL DEFAULT 1,
+        created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Create table: reviews', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS reviews (
+        id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        product_id   VARCHAR(50)  NOT NULL,
+        user_id      CHAR(36)     DEFAULT NULL,
+        user_name    VARCHAR(100) NOT NULL,
+        rating       TINYINT      NOT NULL,
+        title        VARCHAR(200) DEFAULT NULL,
+        comment      TEXT         DEFAULT NULL,
+        is_verified  TINYINT(1)   NOT NULL DEFAULT 0,
+        is_approved  TINYINT(1)   NOT NULL DEFAULT 1,
+        helpful_count INT         NOT NULL DEFAULT 0,
+        created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+        INDEX idx_product (product_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Create table: wishlist', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS wishlist (
+        id         INT         NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id    CHAR(36)    NOT NULL,
+        product_id VARCHAR(50) NOT NULL,
+        created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unq_user_product (user_id, product_id),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Create table: cart', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS cart (
+        id         INT         NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id    CHAR(36)    NOT NULL,
+        product_id VARCHAR(50) NOT NULL,
+        quantity   INT         NOT NULL DEFAULT 1,
+        flavor     VARCHAR(100) DEFAULT NULL,
+        size       VARCHAR(50)  DEFAULT NULL,
+        added_at   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unq_user_prod_var (user_id, product_id, flavor, size),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Create table: addresses', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS addresses (
+        id          INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id     CHAR(36)     NOT NULL,
+        label       VARCHAR(50)  DEFAULT 'Home',
+        full_name   VARCHAR(100) NOT NULL,
+        phone       VARCHAR(20)  DEFAULT NULL,
+        address     VARCHAR(500) NOT NULL,
+        landmark    VARCHAR(200) DEFAULT NULL,
+        city        VARCHAR(100) NOT NULL,
+        state       VARCHAR(100) NOT NULL,
+        pincode     VARCHAR(10)  NOT NULL,
+        is_default  TINYINT(1)   NOT NULL DEFAULT 0,
+        created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Create table: coupons', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS coupons (
+        id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        code         VARCHAR(50)  NOT NULL UNIQUE,
+        description  VARCHAR(255) DEFAULT NULL,
+        discount_type ENUM('percent','flat') NOT NULL DEFAULT 'percent',
+        discount_value DECIMAL(10,2) NOT NULL,
+        min_amount   DECIMAL(10,2) DEFAULT 0,
+        max_discount DECIMAL(10,2) DEFAULT NULL,
+        usage_limit  INT          DEFAULT NULL,
+        used_count   INT          NOT NULL DEFAULT 0,
+        starts_at    DATETIME     DEFAULT NULL,
+        expires_at   DATETIME     DEFAULT NULL,
+        is_active    TINYINT(1)   NOT NULL DEFAULT 1,
+        created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Create table: subscriptions', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS subscriptions (
+        id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id      CHAR(36)     NOT NULL,
+        product_id   VARCHAR(50)  NOT NULL,
+        frequency_days INT        NOT NULL DEFAULT 30,
+        next_delivery DATE        DEFAULT NULL,
+        quantity     INT          NOT NULL DEFAULT 1,
+        price        DECIMAL(10,2) NOT NULL,
+        status       ENUM('active','paused','cancelled') NOT NULL DEFAULT 'active',
+        created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Create table: newsletter', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS newsletter (
+        id         INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        email      VARCHAR(255) NOT NULL UNIQUE,
+        name       VARCHAR(100) DEFAULT NULL,
+        is_active  TINYINT(1)   NOT NULL DEFAULT 1,
+        subscribed_at DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Create table: contact_messages', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS contact_messages (
+        id         INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        name       VARCHAR(100) NOT NULL,
+        email      VARCHAR(255) NOT NULL,
+        phone      VARCHAR(20)  DEFAULT NULL,
+        subject    VARCHAR(200) DEFAULT NULL,
+        message    TEXT         NOT NULL,
+        is_read    TINYINT(1)   NOT NULL DEFAULT 0,
+        created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Create table: appointments', fn() => $pdo->exec("
+    CREATE TABLE IF NOT EXISTS appointments (
+        id             INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id        CHAR(36)     DEFAULT NULL,
+        customer_name  VARCHAR(100) NOT NULL,
+        customer_email VARCHAR(255) NOT NULL,
+        customer_phone VARCHAR(20)  NOT NULL,
+        service_type   VARCHAR(100) NOT NULL,
+        preferred_date DATE         NOT NULL,
+        preferred_time VARCHAR(20)  NOT NULL,
+        notes          TEXT         DEFAULT NULL,
+        status         ENUM('pending','confirmed','completed','cancelled') NOT NULL DEFAULT 'pending',
+        created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"));
+
+step('Add category_id/brand_id columns to products', function() use ($pdo) {
+    // Add columns if they don't exist (MySQL 8+ supports IF NOT EXISTS, but for safety we try/catch)
+    try { $pdo->exec("ALTER TABLE products ADD COLUMN category_id VARCHAR(50) DEFAULT NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE products ADD COLUMN brand_id VARCHAR(50) DEFAULT NULL"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE products ADD INDEX idx_category (category_id)"); } catch (Exception $e) {}
+    try { $pdo->exec("ALTER TABLE products ADD INDEX idx_brand (brand_id)"); } catch (Exception $e) {}
+});
+
 // ── Create uploads directory ──────────────────────────────────────────────
 step('Create uploads/ directory', function() {
     $dir = dirname(__DIR__) . '/uploads/';
@@ -228,6 +405,70 @@ step('Seed products (8 default products)', function() use ($pdo) {
          '["shaker","accessories","gym"]',0],
     ];
     foreach ($products as $p) $ins->execute($p);
+});
+
+// ── Seed categories ──────────────────────────────────────────────────────
+step('Seed categories (8 categories)', function() use ($pdo) {
+    $ins = $pdo->prepare(
+        'INSERT IGNORE INTO categories (id,name,slug,icon,color,sort_order) VALUES (?,?,?,?,?,?)'
+    );
+    $cats = [
+        ['protein',      'Protein',      'protein',      '💪', '#FF6B00', 1],
+        ['creatine',     'Creatine',     'creatine',     '⚡', '#FF8C3A', 2],
+        ['pre-workout',  'Pre-Workout',  'pre-workout',  '🔥', '#E55A00', 3],
+        ['mass-gainer',  'Mass Gainer',  'mass-gainer',  '🏋️', '#FF6B00', 4],
+        ['bcaa',         'BCAA / EAA',   'bcaa',         '🧬', '#FF8C3A', 5],
+        ['fat-burner',   'Fat Burner',   'fat-burner',   '🌡️', '#E55A00', 6],
+        ['vitamins',     'Vitamins',     'vitamins',     '💊', '#FF6B00', 7],
+        ['accessories',  'Accessories',  'accessories',  '🥤', '#FF8C3A', 8],
+    ];
+    foreach ($cats as $c) $ins->execute($c);
+});
+
+// ── Seed brands ──────────────────────────────────────────────────────────
+step('Seed brands (8 brands)', function() use ($pdo) {
+    $ins = $pdo->prepare(
+        'INSERT IGNORE INTO brands (id,name,slug,country,is_featured) VALUES (?,?,?,?,?)'
+    );
+    $brands = [
+        ['optimum-nutrition', 'Optimum Nutrition', 'optimum-nutrition', 'USA', 1],
+        ['muscleblaze',       'MuscleBlaze',       'muscleblaze',       'India', 1],
+        ['cellucor',          'Cellucor',          'cellucor',          'USA', 1],
+        ['muscletech',        'MuscleTech',        'muscletech',        'USA', 1],
+        ['bpi-sports',        'BPI Sports',        'bpi-sports',        'USA', 0],
+        ['myprotein',         'MyProtein',         'myprotein',         'UK', 0],
+        ['gnc',               'GNC',               'gnc',               'USA', 0],
+        ['dymatize',          'Dymatize',          'dymatize',          'USA', 0],
+    ];
+    foreach ($brands as $b) $ins->execute($b);
+});
+
+// ── Seed welcome coupons ─────────────────────────────────────────────────
+step('Seed welcome coupons (3 default codes)', function() use ($pdo) {
+    $ins = $pdo->prepare(
+        'INSERT IGNORE INTO coupons
+         (code, description, discount_type, discount_value, min_amount, max_discount, is_active)
+         VALUES (?,?,?,?,?,?,?)'
+    );
+    $coupons = [
+        ['WELCOME10', 'Welcome offer: 10% off on first order', 'percent', 10, 500, 300, 1],
+        ['FLAT500',   'Flat ₹500 off on orders above ₹3000',   'flat',    500, 3000, null, 1],
+        ['MEGA20',    'Mega offer: 20% off on all supplements','percent', 20, 2000, 1000, 1],
+    ];
+    foreach ($coupons as $c) $ins->execute($c);
+});
+
+// ── Link products to their category and brand ────────────────────────────
+step('Link products to categories & brands', function() use ($pdo) {
+    // Set category_id = category slug (already matches)
+    $pdo->exec("UPDATE products SET category_id = category WHERE category_id IS NULL AND category IS NOT NULL");
+    // Set brand_id from brand name by matching brand slug
+    $pdo->exec("
+        UPDATE products p
+        JOIN brands b ON b.name = p.brand
+        SET p.brand_id = b.id
+        WHERE p.brand_id IS NULL
+    ");
 });
 
 // ── Print results ─────────────────────────────────────────────────────────
