@@ -43,5 +43,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Local Netlify folder
-.netlify
+# Markdown docs (internal only)
+*.md
+
+# Legacy flat-file storage
+public/data/
+
+# One-time setup scripts
+public/setup.php
+
+# DB credentials — set directly on cPanel, never commit
+# (public/api/_config.php is committed with placeholder values)

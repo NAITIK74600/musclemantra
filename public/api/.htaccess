@@ -1,0 +1,22 @@
+# Muscle Mantra — API directory rules
+# Disables ModSecurity WAF rules that block JSON POST requests (415 error)
+
+<IfModule mod_security2.c>
+    SecRuleEngine Off
+</IfModule>
+
+# Allow JSON and multipart content types
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+</IfModule>
+
+# Block direct access to config and helper files
+<FilesMatch "^(_config|db)\.php$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# PHP settings for uploads
+php_value upload_max_filesize 10M
+php_value post_max_size 12M
+php_value max_execution_time 60
