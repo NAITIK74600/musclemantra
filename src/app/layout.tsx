@@ -5,6 +5,7 @@ import ConditionalChrome from "@/components/ConditionalChrome";
 import CartProvider from "@/components/CartProvider";
 import ToastProvider from "@/components/ToastProvider";
 import GoogleAuthProvider from "@/components/GoogleAuthProvider";
+import Analytics from "@/components/Analytics";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -148,6 +149,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-black text-[#F5F5F5] overflow-x-hidden">
+        <Analytics />
         <GoogleAuthProvider>
           <ToastProvider>
             <CartProvider>
