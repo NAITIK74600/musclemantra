@@ -106,21 +106,25 @@ function HeroSection() {
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
               className="inline-flex items-center gap-2 mb-5 sm:mb-6 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10">
               <CheckCircle2 size={13} className="text-[#FF6B00]" />
-              <span className="text-[10.5px] sm:text-[11px] font-semibold text-white/90 tracking-wide">100% Authentic Â· Patna&apos;s Supplement Store</span>
+              <span className="text-[10.5px] sm:text-[11px] font-semibold text-white/90 tracking-wide">100% Authentic · Patna&apos;s Supplement Store</span>
             </motion.div>
 
-            {/* Headline */}
+            {/* Headline — H1 includes brand name "Muscle Mantra" so it matches OAuth app name */}
             <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.6 }}
-              className="font-[var(--font-montserrat)] font-black uppercase leading-[0.95] tracking-tight mb-4 sm:mb-5 text-white"
-              style={{ fontSize: 'clamp(2.25rem, 5.4vw + 0.5rem, 5rem)' }}>
-              Fuel Your<br />
-              <span className="text-gradient">Strength</span>
+              className="font-[var(--font-montserrat)] font-black uppercase leading-[0.95] tracking-tight mb-4 sm:mb-5 text-white">
+              <span className="block text-[#FF6B00] text-[13px] sm:text-[14px] font-black tracking-[0.28em] mb-2 sm:mb-3">
+                MUSCLE MANTRA
+              </span>
+              <span className="block" style={{ fontSize: 'clamp(2.25rem, 5.4vw + 0.5rem, 5rem)' }}>
+                Fuel Your<br />
+                <span className="text-gradient">Strength</span>
+              </span>
             </motion.h1>
 
-            {/* Subcopy */}
+            {/* Subcopy — clearly explains the app's purpose for OAuth verification */}
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
-              className="text-white/70 text-[14.5px] sm:text-base md:text-lg mb-6 sm:mb-7 leading-relaxed max-w-md">
-              Genuine whey, creatine, pre-workout &amp; more from the brands you trust â€” delivered to your door in 30 minutes.
+              className="text-white/70 text-[14.5px] sm:text-base md:text-lg mb-6 sm:mb-7 leading-relaxed max-w-lg">
+              <strong className="text-white/90 font-semibold">Muscle Mantra</strong> is India&apos;s trusted online supplement store. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA from top brands — delivered to your door.
             </motion.p>
 
             {/* CTAs */}
@@ -607,14 +611,41 @@ function PromoBanner() {
    TESTIMONIALS  (removed â€” no fabricated customer quotes)
    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────
+   ABOUT MUSCLE MANTRA — explicit purpose statement for OAuth
+   verification + SEO. Google's bot needs to see clear text
+   explaining what this website/app does.
+   ───────────────────────────────────────────────────────────── */
+function AboutStrip() {
+  return (
+    <section className="py-10 md:py-14 bg-[#0a0a0a] border-y border-[rgba(255,255,255,0.05)]">
+      <div className="container-max">
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="eyebrow mb-4">About Muscle Mantra</div>
+          <h2 className="section-title mb-4">
+            India&apos;s trusted online <span className="text-[#FF6B00]">supplement store</span>
+          </h2>
+          <p className="text-white/65 text-[14.5px] sm:text-[15px] leading-relaxed">
+            <strong className="text-white">Muscle Mantra</strong> is an e-commerce platform based in Patna, Bihar, that sells authentic bodybuilding and fitness supplements online across India. Customers can browse, purchase, and get home delivery of <strong className="text-white/90">whey protein, creatine, pre-workout, mass gainer, BCAA, multivitamins, and fitness accessories</strong> from top brands like Optimum Nutrition, MuscleBlaze, GNC, and more — all 100% genuine and lab-verified.
+          </p>
+          <p className="text-white/50 text-[13.5px] sm:text-[14px] leading-relaxed mt-3">
+            Create a free account to save your cart, track orders, build supplement stacks, and get personalised nutrition recommendations. Sign in with Google or email — no login required to browse products.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
    PAGE
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────── */
 export default function HomePage() {
   return (
     <>
       <HeroSection />
       <TrustStrip />
+      <AboutStrip />
       <CategoriesSection />
       <FlashDealsSection />
       <BestsellersSection />
