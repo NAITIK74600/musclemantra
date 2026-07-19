@@ -199,7 +199,7 @@ function AdminDashboard() {
   interface AdminOrder {
     id: string;
     items: { name: string; price: number; quantity: number }[];
-    shippingAddress: { name: string; phone: string; email?: string; address: string; area: string; city: string; pincode: string };
+    shippingAddress: { name: string; phone: string; email?: string; address: string; area: string; city: string; state?: string; pincode: string };
     paymentMethod: string;
     total: number;
     status: string;
@@ -219,7 +219,30 @@ function AdminDashboard() {
       });
       if (res.ok) {
         const data = await res.json();
-        setOrderList(Array.isArray(data) ? data : []);
+        // Normalize DB rows (snake_case, flat address) → admin shape
+        const norm = (r: Record<string, unknown>): AdminOrder => {
+          const sa = (r.shippingAddress ?? {}) as Record<string, unknown>;
+          const str = (v: unknown) => (v == null ? '' : String(v));
+          return {
+            id: str(r.id),
+            items: Array.isArray(r.items) ? (r.items as AdminOrder['items']) : [],
+            shippingAddress: {
+              name: str(r.customer_name ?? sa.name),
+              phone: str(r.customer_phone ?? sa.phone),
+              email: str(r.customer_email ?? sa.email),
+              address: str(r.address ?? sa.address),
+              area: str(r.area ?? sa.area),
+              city: str(r.city ?? sa.city),
+              state: str(r.state ?? sa.state),
+              pincode: str(r.pincode ?? sa.pincode),
+            },
+            paymentMethod: str(r.payment_method ?? r.paymentMethod ?? 'cod'),
+            total: Number(r.total) || 0,
+            status: str(r.status ?? 'Pending'),
+            createdAt: str(r.created_at ?? r.createdAt),
+          };
+        };
+        setOrderList(Array.isArray(data) ? data.map(norm) : []);
       }
     } catch { /* silent */ }
     setOrdersLoading(false);
