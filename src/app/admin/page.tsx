@@ -11,8 +11,7 @@ import {
   Search, Mail, Check, X, Truck, AlertTriangle, Percent,
   MessageSquare, Save, Plus, Image as ImageIcon,
   Megaphone, Film, Upload, Award, Play, LayoutGrid, Minus,
-  Loader2, KeyRound, Calendar, Clock, CalendarCheck, CalendarX,
-  PhoneCall, CheckCircle,
+  Loader2, KeyRound, Shield, UserPlus, MailCheck, Crown,
 } from 'lucide-react';
 import {
   getBrands, saveBrands, getPromos, savePromos, fileToDataURL, uid,
@@ -21,18 +20,15 @@ import {
   getProducts, saveProducts, addProduct, updateProduct, deleteProduct, type AdminProduct,
   getCategories, saveCategories, addCategory, updateCategory, deleteCategory, type AdminCategory,
 } from '@/lib/store';
-import {
-  getAppointments, updateAppointmentStatus, deleteAppointment,
-  onAppointmentChange, APPOINTMENT_TYPES, STATUS_CONFIG,
-  type Appointment, type AppointmentStatus,
-} from '@/lib/appointments';
 import { useToast } from '@/components/ToastProvider';
 import AdminGate from '@/components/AdminGate';
-import { signOutAdmin, getAdminEmail, changeAdminPassword } from '@/lib/adminAuth';
+import {
+  signOutAdmin, getAdminEmail, changeAdminPassword, isAdminOwner,
+  listAdmins, appointAdmin, revokeAdmin, type AdminUser,
+} from '@/lib/adminAuth';
 
 const sidebarItems = [
   { id: 'dashboard',     icon: LayoutDashboard,  label: 'Dashboard' },
-  { id: 'appointments',  icon: Calendar,          label: 'Appointments' },
   { id: 'orders',        icon: ShoppingCart,      label: 'Orders',          badge: 'live' },
   { id: 'products',      icon: Box,               label: 'Products' },
   { id: 'categories',    icon: LayoutGrid,        label: 'Categories' },
@@ -46,6 +42,7 @@ const sidebarItems = [
   { id: 'reviews',       icon: Star,              label: 'Reviews' },
   { id: 'support',       icon: HeadphonesIcon,    label: 'Support Tickets', badge: '5' },
   { id: 'cms',           icon: FileText,          label: 'CMS' },
+  { id: 'admins',        icon: Shield,            label: 'Admins',          ownerOnly: true },
   { id: 'settings',      icon: Settings,          label: 'Settings' },
 ];
 
@@ -183,11 +180,137 @@ function AdminPasswordChange({ adminEmail }: { adminEmail: string }) {
   );
 }
 
+// ── Admins management (owner only) ──────────────────────────────────────────
+function AdminsSection() {
+  const toast = useToast();
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await listAdmins();
+    setLoading(false);
+    if (res.ok) setAdmins(res.admins ?? []);
+    else toast.push({ variant: 'error', title: 'Could not load admins', description: res.error });
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const appoint = async () => {
+    if (!name.trim() || !email.trim()) { toast.push({ variant: 'error', title: 'Enter name and email' }); return; }
+    setBusy(true);
+    const res = await appointAdmin(name, email);
+    setBusy(false);
+    if (res.ok) {
+      toast.push({
+        variant: 'success',
+        title: 'Admin appointed',
+        description: res.emailed ? 'A set-password OTP was emailed to them.' : 'User promoted (email could not be sent).',
+      });
+      setName(''); setEmail('');
+      load();
+    } else {
+      toast.push({ variant: 'error', title: 'Could not appoint', description: res.error });
+    }
+  };
+
+  const revoke = async (u: AdminUser) => {
+    if (u.isOwner) return;
+    if (!confirm(`Remove admin access for ${u.email}?`)) return;
+    const res = await revokeAdmin(u.id);
+    if (res.ok) { toast.push({ variant: 'info', title: 'Admin access removed', description: u.email }); load(); }
+    else toast.push({ variant: 'error', title: 'Could not revoke', description: res.error });
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5 max-w-4xl">
+      <div>
+        <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white flex items-center gap-2">
+          <Shield size={20} className="text-[#FF6B00]" /> Admins
+        </h2>
+        <p className="text-[rgba(245,245,245,0.4)] text-sm mt-0.5">Appoint or remove admins. New admins get an email to set their password.</p>
+      </div>
+
+      {/* Appoint form */}
+      <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
+        <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+          <UserPlus size={16} className="text-[#FF6B00]" /> Appoint a new admin
+        </h3>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[11px] font-bold text-[rgba(245,245,245,0.45)] uppercase tracking-wide mb-1.5">Name</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Full name"
+              className="w-full px-3.5 py-2.5 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-xl text-sm text-white focus:border-[#FF6B00] focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-[rgba(245,245,245,0.45)] uppercase tracking-wide mb-1.5">Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@example.com"
+              className="w-full px-3.5 py-2.5 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-xl text-sm text-white focus:border-[#FF6B00] focus:outline-none" />
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button onClick={appoint} disabled={busy}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-all">
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+            {busy ? 'Appointing…' : 'Appoint admin'}
+          </button>
+        </div>
+      </div>
+
+      {/* Admin list */}
+      <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden">
+        <div className="px-5 py-3 border-b border-[rgba(255,255,255,0.06)] flex items-center justify-between">
+          <p className="text-[11px] font-bold tracking-widest uppercase text-[rgba(245,245,245,0.4)]">Current admins</p>
+          <button onClick={load} className="text-[11px] text-[#FF6B00] font-bold hover:underline">Refresh</button>
+        </div>
+        {loading ? (
+          <div className="p-10 text-center"><Loader2 size={20} className="text-[#FF6B00] animate-spin mx-auto" /></div>
+        ) : admins.length === 0 ? (
+          <div className="p-10 text-center text-[rgba(245,245,245,0.4)] text-sm">No admins yet.</div>
+        ) : (
+          <div className="divide-y divide-[rgba(255,255,255,0.05)]">
+            {admins.map(u => (
+              <div key={u.id} className="flex items-center gap-3 px-5 py-3.5">
+                <div className="w-9 h-9 rounded-full bg-[rgba(255,107,0,0.12)] flex items-center justify-center text-[#FF6B00] font-bold text-sm shrink-0">
+                  {(u.name || u.email).charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] text-white font-semibold flex items-center gap-1.5">
+                    {u.name || '—'}
+                    {u.isOwner && <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full"><Crown size={9} /> OWNER</span>}
+                  </p>
+                  <p className="text-[11px] text-[rgba(245,245,245,0.4)] truncate">{u.email}</p>
+                </div>
+                {u.isOwner ? (
+                  <span className="text-[10px] font-bold text-[rgba(245,245,245,0.35)]">Super admin</span>
+                ) : u.activated ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full"><MailCheck size={10} /> Active</span>
+                ) : (
+                  <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">Pending setup</span>
+                )}
+                {!u.isOwner && (
+                  <button onClick={() => revoke(u)} title="Remove admin"
+                    className="p-1.5 text-[rgba(245,245,245,0.3)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all shrink-0"><Trash2 size={14} /></button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 function AdminDashboard() {
   const toast = useToast();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const adminEmail = getAdminEmail() ?? 'admin';
+  const [owner, setOwner] = useState(false);
+  useEffect(() => { setOwner(isAdminOwner()); }, []);
   const [toggles, setToggles] = useState({
     cod: true, onlinePay: true, sameDay: true, lowStockAlerts: true, reviews: false, maintenance: false,
   });
@@ -500,51 +623,6 @@ function AdminDashboard() {
     if (updated) toast.push({ variant: 'info', title: 'Logo removed', description: updated.name });
   };
 
-  // ── Appointments ─────────────────────────────────────────────────────────
-  const [apptList, setApptList] = useState<Appointment[]>([]);
-  const [apptFilterDate, setApptFilterDate] = useState('');
-  const [apptFilterStatus, setApptFilterStatus] = useState<AppointmentStatus | 'all'>('all');
-  const [apptFilterType, setApptFilterType] = useState<string>('all');
-  const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
-
-  useEffect(() => {
-    setApptList(getAppointments());
-    return onAppointmentChange(() => setApptList(getAppointments()));
-  }, []);
-
-  const filteredAppts = useMemo(() => {
-    return apptList.filter(a => {
-      if (apptFilterStatus !== 'all' && a.status !== apptFilterStatus) return false;
-      if (apptFilterType !== 'all' && a.type !== apptFilterType) return false;
-      if (apptFilterDate && a.date !== apptFilterDate) return false;
-      return true;
-    });
-  }, [apptList, apptFilterStatus, apptFilterType, apptFilterDate]);
-
-  const apptStats = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    return {
-      total: apptList.length,
-      todayCount: apptList.filter(a => a.date === today).length,
-      pending: apptList.filter(a => a.status === 'pending').length,
-      confirmed: apptList.filter(a => a.status === 'confirmed').length,
-    };
-  }, [apptList]);
-
-  const changeApptStatus = (id: string, status: AppointmentStatus) => {
-    updateAppointmentStatus(id, status);
-    setApptList(getAppointments());
-    if (selectedAppt?.id === id) setSelectedAppt(a => a ? { ...a, status } : null);
-    toast.push({ variant: 'success', title: `Appointment ${status}` });
-  };
-
-  const removeAppt = (id: string) => {
-    deleteAppointment(id);
-    setApptList(getAppointments());
-    if (selectedAppt?.id === id) setSelectedAppt(null);
-    toast.push({ variant: 'info', title: 'Appointment deleted' });
-  };
-
   // ── Inventory (uses product list — inline stock/reorder edit) ────────────
   const [invSearch, setInvSearch] = useState('');
   const setStock = (id: string, stock: number) => {
@@ -595,7 +673,7 @@ function AdminDashboard() {
         </div>
 
         <nav className="flex-1 py-3 overflow-y-auto">
-          {sidebarItems.map(item => (
+          {sidebarItems.filter(item => owner || !item.ownerOnly).map(item => (
             <button key={item.id} onClick={() => setActiveSection(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-2.5 text-[12px] transition-all relative ${activeSection === item.id ? 'bg-[rgba(255,107,0,0.1)] text-white border-l-2 border-[#FF6B00]' : 'text-[rgba(245,245,245,0.5)] hover:text-white hover:bg-white/5'}`}>
               <item.icon size={15} className={activeSection === item.id ? 'text-[#FF6B00]' : ''} />
@@ -663,14 +741,12 @@ function AdminDashboard() {
                   { label: 'Categories', value: String(activeCategories.length), sub: `${categoryList.length} total`, icon: LayoutGrid, color: '#34d399' },
                   { label: 'Inventory Value', value: `₹${invValue.toLocaleString('en-IN')}`, sub: 'live from store', icon: DollarSign, color: '#FF6B00' },
                   { label: 'Brands', value: String(brandList.length), sub: 'active brands', icon: Award, color: '#a78bfa' },
-                  { label: "Today's Appts", value: String(apptStats.todayCount), sub: `${apptStats.pending} pending`, icon: Calendar, color: '#34d399', clickSection: 'appointments' as string },
                 ];
                 return (
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {liveStats.map((s, i) => (
                       <motion.div key={s.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-                        onClick={() => s.clickSection && setActiveSection(s.clickSection)}
-                        className={`bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-4 ${s.clickSection ? 'cursor-pointer hover:border-[rgba(255,107,0,0.2)] transition-colors' : ''}`}>
+                        className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-4">
                         <div className="flex items-center justify-between mb-3">
                           <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${s.color}18` }}>
                             <s.icon size={17} style={{ color: s.color }} />
@@ -1675,238 +1751,8 @@ function AdminDashboard() {
             </motion.div>
           )}
 
-          {/* APPOINTMENTS */}
-          {activeSection === 'appointments' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
-              {/* Header */}
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                  <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Appointments</h2>
-                  <p className="text-[rgba(245,245,245,0.4)] text-sm mt-0.5">Manage customer bookings and consultation slots</p>
-                </div>
-                <a href="/book" target="_blank" rel="noreferrer"
-                  className="flex items-center gap-2 px-4 py-2.5 bg-[rgba(255,107,0,0.1)] border border-[rgba(255,107,0,0.25)] text-[#FF6B00] text-sm font-bold rounded-xl hover:bg-[#FF6B00] hover:text-white transition-all">
-                  <Calendar size={14} /> Booking Page ↗
-                </a>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { label: 'Total', value: apptStats.total, icon: Calendar, color: '#a78bfa' },
-                  { label: "Today's", value: apptStats.todayCount, icon: CalendarCheck, color: '#34d399' },
-                  { label: 'Pending', value: apptStats.pending, icon: Clock, color: '#fbbf24' },
-                  { label: 'Confirmed', value: apptStats.confirmed, icon: CheckCircle, color: '#60a5fa' },
-                ].map(s => (
-                  <div key={s.label} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${s.color}18` }}>
-                        <s.icon size={16} style={{ color: s.color }} />
-                      </div>
-                    </div>
-                    <p className="text-2xl font-black text-white">{s.value}</p>
-                    <p className="text-[11px] text-[rgba(245,245,245,0.4)]">{s.label} Appointments</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Filters */}
-              <div className="flex flex-wrap gap-3 p-4 bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)]">
-                <div className="flex items-center gap-2 flex-1 min-w-[140px]">
-                  <Calendar size={13} className="text-[rgba(245,245,245,0.35)] shrink-0" />
-                  <input type="date" value={apptFilterDate} onChange={e => setApptFilterDate(e.target.value)}
-                    className="bg-transparent text-sm text-white outline-none flex-1 [color-scheme:dark]" />
-                  {apptFilterDate && (
-                    <button onClick={() => setApptFilterDate('')} className="text-[rgba(245,245,245,0.35)] hover:text-white">
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
-                <select value={apptFilterStatus} onChange={e => setApptFilterStatus(e.target.value as AppointmentStatus | 'all')}
-                  className="px-3 py-2 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-white outline-none focus:border-[#FF6B00]">
-                  <option value="all">All Statuses</option>
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="no-show">No Show</option>
-                </select>
-                <select value={apptFilterType} onChange={e => setApptFilterType(e.target.value)}
-                  className="px-3 py-2 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-white outline-none focus:border-[#FF6B00]">
-                  <option value="all">All Types</option>
-                  {(Object.entries(APPOINTMENT_TYPES) as [string, { label: string }][]).map(([id, info]) => (
-                    <option key={id} value={id}>{info.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Table + Detail panel */}
-              <div className="flex gap-5">
-                {/* Table */}
-                <div className={`bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden flex-1 min-w-0 transition-all ${selectedAppt ? 'lg:w-[60%]' : 'w-full'}`}>
-                  {filteredAppts.length === 0 ? (
-                    <div className="p-10 text-center">
-                      <Calendar size={32} className="text-[rgba(245,245,245,0.1)] mx-auto mb-3" />
-                      <p className="text-[rgba(245,245,245,0.4)] text-sm">No appointments found.</p>
-                      <a href="/book" target="_blank" rel="noreferrer" className="mt-3 inline-block text-[#FF6B00] text-sm font-bold hover:underline">
-                        Share booking link →
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)]">
-                            {['ID', 'Customer', 'Type', 'Date & Time', 'Status', 'Actions'].map(h => (
-                              <th key={h} className="text-left px-4 py-3 text-[10px] font-bold tracking-widest text-[rgba(245,245,245,0.35)] uppercase">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredAppts.map(a => {
-                            const typeInfo = APPOINTMENT_TYPES[a.type];
-                            const statusInfo = STATUS_CONFIG[a.status];
-                            return (
-                              <tr key={a.id}
-                                onClick={() => setSelectedAppt(sel => sel?.id === a.id ? null : a)}
-                                className={`border-b border-[rgba(255,255,255,0.04)] transition-colors cursor-pointer ${selectedAppt?.id === a.id ? 'bg-[rgba(255,107,0,0.06)]' : 'hover:bg-white/[0.02]'}`}>
-                                <td className="px-4 py-3 text-[11px] font-mono text-[#FF6B00] font-bold">{a.id}</td>
-                                <td className="px-4 py-3">
-                                  <p className="text-[13px] text-white font-semibold">{a.customerName}</p>
-                                  <p className="text-[11px] text-[rgba(245,245,245,0.4)]">{a.customerPhone}</p>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className="text-[13px]">{typeInfo.icon}</span>{' '}
-                                  <span className="text-[12px] text-[rgba(245,245,245,0.65)]">{typeInfo.label}</span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <p className="text-[12px] text-white">{new Date(a.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
-                                  <p className="text-[11px] text-[rgba(245,245,245,0.4)] flex items-center gap-1"><Clock size={10} /> {a.timeSlot}</p>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusInfo.color}`}>{statusInfo.label}</span>
-                                </td>
-                                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                                  <div className="flex gap-1">
-                                    {a.status === 'pending' && (
-                                      <button onClick={() => changeApptStatus(a.id, 'confirmed')} title="Confirm"
-                                        className="p-1.5 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"><CalendarCheck size={13} /></button>
-                                    )}
-                                    {(a.status === 'pending' || a.status === 'confirmed') && (
-                                      <button onClick={() => changeApptStatus(a.id, 'completed')} title="Mark Complete"
-                                        className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-all"><Check size={13} /></button>
-                                    )}
-                                    {a.status !== 'cancelled' && a.status !== 'completed' && (
-                                      <button onClick={() => changeApptStatus(a.id, 'cancelled')} title="Cancel"
-                                        className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><CalendarX size={13} /></button>
-                                    )}
-                                    <button onClick={() => removeAppt(a.id)} title="Delete"
-                                      className="p-1.5 text-[rgba(245,245,245,0.3)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={13} /></button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                {/* Detail panel */}
-                <AnimatePresence>
-                  {selectedAppt && (
-                    <motion.div
-                      key={selectedAppt.id}
-                      initial={{ opacity: 0, x: 16, width: 0 }}
-                      animate={{ opacity: 1, x: 0, width: 280 }}
-                      exit={{ opacity: 0, x: 16, width: 0 }}
-                      transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-                      className="shrink-0 bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5 overflow-hidden hidden lg:block"
-                      style={{ minWidth: 280, maxWidth: 280 }}
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <p className="text-[11px] font-bold tracking-widest uppercase text-[#FF6B00]">Appointment Detail</p>
-                        <button onClick={() => setSelectedAppt(null)} className="text-[rgba(245,245,245,0.4)] hover:text-white"><X size={14} /></button>
-                      </div>
-
-                      <div className="space-y-3 text-[13px]">
-                        <div className="p-3 rounded-xl bg-[rgba(255,107,0,0.06)] border border-[rgba(255,107,0,0.15)]">
-                          <p className="text-[10px] font-bold text-[#FF6B00] uppercase mb-1">ID</p>
-                          <p className="font-mono font-bold text-white text-[11px]">{selectedAppt.id}</p>
-                        </div>
-
-                        <div>
-                          <p className="text-[10px] font-bold text-[rgba(245,245,245,0.35)] uppercase mb-1">Customer</p>
-                          <p className="font-semibold text-white">{selectedAppt.customerName}</p>
-                          <a href={`tel:${selectedAppt.customerPhone}`} className="flex items-center gap-1.5 text-[#FF6B00] mt-1 hover:underline text-[12px]">
-                            <PhoneCall size={11} /> {selectedAppt.customerPhone}
-                          </a>
-                          {selectedAppt.customerEmail && (
-                            <p className="text-[11px] text-[rgba(245,245,245,0.45)] mt-0.5">{selectedAppt.customerEmail}</p>
-                          )}
-                        </div>
-
-                        <div>
-                          <p className="text-[10px] font-bold text-[rgba(245,245,245,0.35)] uppercase mb-1">Service</p>
-                          <p className="text-white">{APPOINTMENT_TYPES[selectedAppt.type].icon} {APPOINTMENT_TYPES[selectedAppt.type].label}</p>
-                          <p className="text-[11px] text-[rgba(245,245,245,0.4)]">Duration: {APPOINTMENT_TYPES[selectedAppt.type].duration}</p>
-                        </div>
-
-                        <div>
-                          <p className="text-[10px] font-bold text-[rgba(245,245,245,0.35)] uppercase mb-1">When</p>
-                          <p className="text-white">{new Date(selectedAppt.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-                          <p className="text-[rgba(245,245,245,0.5)] flex items-center gap-1 mt-0.5"><Clock size={11} /> {selectedAppt.timeSlot}</p>
-                        </div>
-
-                        {selectedAppt.notes && (
-                          <div>
-                            <p className="text-[10px] font-bold text-[rgba(245,245,245,0.35)] uppercase mb-1">Notes</p>
-                            <p className="text-[rgba(245,245,245,0.6)] text-[12px] leading-relaxed">{selectedAppt.notes}</p>
-                          </div>
-                        )}
-
-                        <div>
-                          <p className="text-[10px] font-bold text-[rgba(245,245,245,0.35)] uppercase mb-1">Status</p>
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${STATUS_CONFIG[selectedAppt.status].color}`}>
-                            {STATUS_CONFIG[selectedAppt.status].label}
-                          </span>
-                        </div>
-
-                        {/* Quick actions */}
-                        <div className="pt-2 border-t border-[rgba(255,255,255,0.07)] space-y-1.5">
-                          {selectedAppt.status === 'pending' && (
-                            <button onClick={() => changeApptStatus(selectedAppt.id, 'confirmed')}
-                              className="w-full flex items-center justify-center gap-2 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 font-bold text-[12px] rounded-xl transition-all border border-blue-500/20">
-                              <CalendarCheck size={13} /> Confirm
-                            </button>
-                          )}
-                          {(selectedAppt.status === 'pending' || selectedAppt.status === 'confirmed') && (
-                            <button onClick={() => changeApptStatus(selectedAppt.id, 'completed')}
-                              className="w-full flex items-center justify-center gap-2 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold text-[12px] rounded-xl transition-all border border-emerald-500/20">
-                              <Check size={13} /> Mark Completed
-                            </button>
-                          )}
-                          {selectedAppt.status !== 'cancelled' && selectedAppt.status !== 'completed' && (
-                            <button onClick={() => changeApptStatus(selectedAppt.id, 'cancelled')}
-                              className="w-full flex items-center justify-center gap-2 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-[12px] rounded-xl transition-all border border-red-500/20">
-                              <CalendarX size={13} /> Cancel
-                            </button>
-                          )}
-                          {selectedAppt.status !== 'no-show' && (
-                            <button onClick={() => changeApptStatus(selectedAppt.id, 'no-show')}
-                              className="w-full flex items-center justify-center gap-2 py-2 bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.07)] text-[rgba(245,245,245,0.4)] font-bold text-[12px] rounded-xl transition-all border border-[rgba(255,255,255,0.06)]">
-                              <X size={13} /> No Show
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          )}
+          {/* ADMINS (owner only) */}
+          {activeSection === 'admins' && owner && <AdminsSection />}
 
           {/* SETTINGS */}
           {activeSection === 'settings' && (

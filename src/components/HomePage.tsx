@@ -544,8 +544,8 @@ function NewsletterBand() {
       setBusy(false);
       setEmail('');
       push({
-        title: 'ðŸŽ‰ Youâ€™re in!',
-        description: 'Check your inbox for a â‚¹200 off code.',
+        title: '🎉 You\u2019re in!',
+        description: 'Check your inbox for a \u20b9200 off code.',
         variant: 'success',
       });
     }, 500);
@@ -563,7 +563,7 @@ function NewsletterBand() {
                 <span className="text-[10px] font-bold tracking-[0.22em] uppercase text-[#FF6B00]">Now serving Patna</span>
               </div>
               <h2 className="font-[var(--font-montserrat)] font-black text-[20px] sm:text-xl md:text-2xl text-white tracking-tight mb-1.5 leading-tight">
-                Get â‚¹200 off your first order
+                Get ₹200 off your first order
               </h2>
               <p className="text-[rgba(245,245,245,0.55)] text-sm">
                 Subscribe for exclusive deals, new arrivals and nutrition tips.

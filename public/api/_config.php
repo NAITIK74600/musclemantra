@@ -35,6 +35,19 @@ define('MAIL_FROM',      mm_env('MAIL_FROM',      'noreply@musclemantra.shop'));
 define('MAIL_FROM_NAME', mm_env('MAIL_FROM_NAME', 'Muscle Mantra'));
 define('MAIL_REPLY_TO',  mm_env('MAIL_REPLY_TO',  'admin@musclemantra.shop'));
 
+// ── Owner (super-admin) ───────────────────────────────────────────────────
+// The owner always logs in with this email; password lives in api/.env.
+// Only the owner can appoint or revoke other admins.
+define('OWNER_EMAIL',    mm_env('OWNER_EMAIL',    'admin@musclemantra.shop'));
+define('OWNER_PASSWORD', mm_env('OWNER_PASSWORD', ''));  // set this in api/.env
+
+// ── SMTP (used to send OTP / password-reset emails) ──────────────────────
+define('SMTP_HOST',   mm_env('SMTP_HOST',   'mail.musclemantra.shop'));
+define('SMTP_PORT',   (int) mm_env('SMTP_PORT', '465'));
+define('SMTP_SECURE', mm_env('SMTP_SECURE', 'ssl'));   // 'ssl' (465) or 'tls' (587)
+define('SMTP_USER',   mm_env('SMTP_USER',   'noreply@musclemantra.shop'));
+define('SMTP_PASS',   mm_env('SMTP_PASS',   ''));       // set this in api/.env
+
 // ── Site URL (no trailing slash) ─────────────────────────────────────────
 define('SITE_URL', mm_env('SITE_URL', 'https://musclemantra.shop'));
 

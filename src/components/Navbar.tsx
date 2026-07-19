@@ -123,7 +123,6 @@ const menuLinks = [
   { label: 'BRANDS', href: '/brands' },
   { label: 'STACK BUILDER', href: '/stack-builder' },
   { label: 'OFFERS', href: '/offers' },
-  { label: 'BOOK APPT', href: '/book' },
   { label: 'SERVICES', href: '/services' },
   { label: 'ABOUT', href: '/about' },
   { label: 'CONTACT', href: '/contact' },

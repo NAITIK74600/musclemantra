@@ -1,318 +1,361 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Eye, EyeOff, ShieldCheck, AlertTriangle, Loader2, UserPlus, KeyRound } from 'lucide-react';
 import {
-  hasAdminSetup, isAdminAuthenticated, signInAdmin, setupAdmin,
-  adminLockoutRemaining, verifySetupKey,
+  ShieldCheck, Lock, Mail, Eye, EyeOff, Loader2, ArrowLeft, KeyRound, CheckCircle2,
+} from 'lucide-react';
+import {
+  isAdminAuthenticated,
+  signInAdmin,
+  requestAdminOtp,
+  resetAdminPassword,
 } from '@/lib/adminAuth';
 
-interface Props {
-  children: React.ReactNode;
-  /** Called when admin signs out (triggered from the parent via exposed ref pattern or prop). */
-  onReady?: (signOutFn: () => void) => void;
-}
+type Mode = 'login' | 'forgot';
+type ForgotStep = 'email' | 'otp' | 'done';
 
-export default function AdminGate({ children, onReady }: Props) {
-  const [status, setStatus] = useState<'loading' | 'login' | 'setup' | 'authed'>('loading');
-  const [email, setEmail]     = useState('');
-  const [pw, setPw]           = useState('');
-  const [pw2, setPw2]         = useState('');  // confirm pw for setup
-  const [setupKey, setSetupKey] = useState(''); // secret setup key
-  const [showPw, setShowPw]   = useState(false);
-  const [error, setError]     = useState('');
-  const [busy, setBusy]       = useState(false);
-  const [lockSecs, setLockSecs] = useState(0);
+export default function AdminGate({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
+  const [authed, setAuthed] = useState(false);
+  const [mode, setMode] = useState<Mode>('login');
 
-  // ── Countdown for rate-limit lockout ────────────────────────────────────
   useEffect(() => {
-    if (lockSecs <= 0) return;
-    const t = setInterval(() => setLockSecs(s => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(t);
-  }, [lockSecs]);
-
-  // ── Initial auth check ───────────────────────────────────────────────────
-  useEffect(() => {
-    if (isAdminAuthenticated()) {
-      setStatus('authed');
-      return;
-    }
-    setStatus(hasAdminSetup() ? 'login' : 'setup');
-
-    // Restore any live lockout countdown
-    const rem = adminLockoutRemaining();
-    if (rem > 0) setLockSecs(Math.ceil(rem / 1000));
+    setAuthed(isAdminAuthenticated());
+    setReady(true);
   }, []);
 
-  const handleSignIn = useCallback(async () => {
-    if (busy || lockSecs > 0) return;
-    setError('');
-    setBusy(true);
-    const res = await signInAdmin(email, pw);
-    setBusy(false);
-    if (res.ok) {
-      setStatus('authed');
-    } else {
-      setError(res.error ?? 'Sign-in failed.');
-      const rem = adminLockoutRemaining();
-      if (rem > 0) setLockSecs(Math.ceil(rem / 1000));
-    }
-  }, [busy, lockSecs, email, pw]);
-
-  const handleSetup = useCallback(async () => {
-    if (busy) return;
-    setError('');
-    if (!verifySetupKey(setupKey)) {
-      setError('Invalid setup key. Contact the store owner.');
-      return;
-    }
-    if (pw !== pw2) { setError('Passwords do not match.'); return; }
-    setBusy(true);
-    const res = await setupAdmin(email, pw);
-    setBusy(false);
-    if (res.ok) {
-      // Auto sign in after setup
-      const login = await signInAdmin(email, pw);
-      if (login.ok) setStatus('authed');
-    } else {
-      setError(res.error ?? 'Setup failed.');
-    }
-  }, [busy, email, pw, pw2, setupKey]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      if (status === 'login') handleSignIn();
-      else if (status === 'setup') handleSetup();
-    }
-  };
-
-  // Loading — avoid flash of login screen when session already valid
-  if (status === 'loading') {
+  if (!ready) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <Loader2 size={32} className="text-[#FF6B00] animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-neutral-950">
+        <Loader2 className="w-6 h-6 text-orange-500 animate-spin" />
       </div>
     );
   }
 
-  if (status === 'authed') return <>{children}</>;
-
-  // ── Login / Setup overlay ────────────────────────────────────────────────
-  const isSetup = status === 'setup';
+  if (authed) return <>{children}</>;
 
   return (
-    <AnimatePresence>
+    <div className="min-h-screen flex items-center justify-center bg-neutral-950 px-4 py-12 relative overflow-hidden">
+      {/* ambient glow */}
+      <div className="pointer-events-none absolute -top-40 -right-40 w-96 h-96 rounded-full bg-orange-600/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-orange-500/10 blur-3xl" />
+
       <motion.div
-        key="admin-gate"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="min-h-screen bg-[#030303] flex items-center justify-center px-4 relative overflow-hidden"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="relative w-full max-w-md"
       >
-        {/* Animated background */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-[radial-gradient(ellipse_at_center,rgba(255,107,0,0.07)_0%,transparent_65%)]" />
-          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-[radial-gradient(ellipse_at_center,rgba(255,107,0,0.04)_0%,transparent_65%)]" />
-          {/* Grid */}
-          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(rgba(255,107,0,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,107,0,0.5) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 28, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.45, ease: [0.25, 0.1, 0.25, 1] }}
-          className="w-full max-w-md relative z-10"
-        >
-          {/* Top brand mark */}
-          <div className="flex items-center justify-center gap-3 mb-7">
-            <div className="w-10 h-10 rounded-xl bg-[rgba(255,107,0,0.12)] border border-[rgba(255,107,0,0.3)] flex items-center justify-center">
-              <ShieldCheck size={18} className="text-[#FF6B00]" />
-            </div>
-            <div className="text-left">
-              <p className="text-[13px] font-black text-white leading-none">MUSCLE MANTRA</p>
-              <p className="text-[10px] font-bold tracking-[0.2em] text-[rgba(255,107,0,0.7)] uppercase leading-none mt-0.5">Admin Portal</p>
-            </div>
-          </div>
-
-          {/* Card */}
-          <div className="bg-[#0d0d0d] border border-[rgba(255,255,255,0.08)] rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)]">
-
-            {/* Accent top bar */}
-            <div className="h-0.5 bg-gradient-to-r from-transparent via-[#FF6B00] to-transparent" />
-
-            {/* Header */}
-            <div className="px-8 pt-7 pb-6 border-b border-[rgba(255,255,255,0.05)]">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-2xl bg-[rgba(255,107,0,0.12)] border border-[rgba(255,107,0,0.25)] flex items-center justify-center shrink-0">
-                  {isSetup ? <UserPlus size={18} className="text-[#FF6B00]" /> : <Lock size={18} className="text-[#FF6B00]" />}
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#FF6B00]">
-                    {isSetup ? 'First-time Setup' : 'Secure Sign In'}
-                  </div>
-                  <div className="font-[var(--font-montserrat)] font-black text-white text-[20px] leading-tight mt-0.5">
-                    {isSetup ? 'Create Admin Account' : 'Welcome Back'}
-                  </div>
-                </div>
+        <div className="rounded-2xl border border-white/10 bg-neutral-900/80 backdrop-blur-xl shadow-2xl overflow-hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500" />
+          <div className="p-8">
+            <div className="flex flex-col items-center text-center mb-8">
+              <div className="w-14 h-14 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center mb-4">
+                <ShieldCheck className="w-7 h-7 text-orange-400" />
               </div>
-
-              {isSetup ? (
-                <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-[rgba(255,107,0,0.07)] border border-[rgba(255,107,0,0.2)]">
-                  <AlertTriangle size={14} className="text-[#FF6B00] shrink-0 mt-0.5" />
-                  <p className="text-[12px] text-[rgba(245,245,245,0.7)] leading-relaxed">
-                    Enter the <strong className="text-[#FF6B00]">Setup Key</strong> (from .env) + your email + a password to create the one-time admin account.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-[13px] text-[rgba(245,245,245,0.4)]">
-                  Sign in to manage products, orders, appointments, and more.
-                </p>
-              )}
-            </div>
-
-            {/* Form */}
-            <div className="px-8 py-6 space-y-4" onKeyDown={handleKeyDown}>
-              {/* Setup Key (only shown during first-time setup) */}
-              {isSetup && (
-                <div>
-                  <label className="block text-[11px] font-bold tracking-[0.15em] uppercase text-[rgba(245,245,245,0.45)] mb-1.5">
-                    Setup Key
-                  </label>
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    value={setupKey}
-                    onChange={e => { setSetupKey(e.target.value); setError(''); }}
-                    placeholder="Enter secret setup key"
-                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-[rgba(255,107,0,0.25)] rounded-xl text-sm text-white placeholder:text-[rgba(245,245,245,0.2)] focus:border-[#FF6B00] focus:outline-none transition-colors"
-                  />
-                  <p className="mt-1.5 text-[10px] text-[rgba(245,245,245,0.25)]">Required to create the admin account — contact the site owner.</p>
-                </div>
-              )}
-
-              {/* Email */}
-              <div>
-                <label className="block text-[11px] font-bold tracking-[0.15em] uppercase text-[rgba(245,245,245,0.45)] mb-1.5">
-                  Admin Email
-                </label>
-                <input
-                  type="email"
-                  autoComplete="username"
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); setError(''); }}
-                  placeholder="admin@musclemantra.shop"
-                  className="w-full px-4 py-3 bg-[#0a0a0a] border border-[rgba(255,255,255,0.08)] rounded-xl text-sm text-white placeholder:text-[rgba(245,245,245,0.2)] focus:border-[#FF6B00] focus:outline-none transition-colors"
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-[11px] font-bold tracking-[0.15em] uppercase text-[rgba(245,245,245,0.45)] mb-1.5">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPw ? 'text' : 'password'}
-                    autoComplete={isSetup ? 'new-password' : 'current-password'}
-                    value={pw}
-                    onChange={e => { setPw(e.target.value); setError(''); }}
-                    placeholder={isSetup ? 'Min 8 chars · include a number' : '••••••••'}
-                    className="w-full px-4 py-3 pr-12 bg-[#0a0a0a] border border-[rgba(255,255,255,0.08)] rounded-xl text-sm text-white placeholder:text-[rgba(245,245,245,0.2)] focus:border-[#FF6B00] focus:outline-none transition-colors"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPw(v => !v)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[rgba(245,245,245,0.3)] hover:text-white transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Confirm password (setup only) */}
-              {isSetup && (
-                <div>
-                  <label className="block text-[11px] font-bold tracking-[0.15em] uppercase text-[rgba(245,245,245,0.45)] mb-1.5">
-                    Confirm Password
-                  </label>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    value={pw2}
-                    onChange={e => { setPw2(e.target.value); setError(''); }}
-                    placeholder="Re-enter password"
-                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-[rgba(255,255,255,0.08)] rounded-xl text-sm text-white placeholder:text-[rgba(245,245,245,0.2)] focus:border-[#FF6B00] focus:outline-none transition-colors"
-                  />
-                </div>
-              )}
-
-              {/* Error */}
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20"
-                  >
-                    <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
-                    <p className="text-[12.5px] text-red-400 leading-snug">{error}</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Lockout */}
-              {lockSecs > 0 && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
-                  <Lock size={13} className="text-orange-400 shrink-0" />
-                  <p className="text-[12px] text-orange-400">
-                    Too many attempts — retry in {Math.floor(lockSecs / 60)}:{String(lockSecs % 60).padStart(2, '0')}
-                  </p>
-                </div>
-              )}
-
-              {/* Submit */}
-              <button
-                onClick={isSetup ? handleSetup : handleSignIn}
-                disabled={busy || lockSecs > 0 || !email || !pw || (isSetup && !setupKey)}
-                className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#FF6B00] hover:bg-[#E55A00] disabled:bg-[rgba(255,107,0,0.3)] disabled:cursor-not-allowed text-white font-black rounded-xl text-[14px] transition-all shadow-[0_0_20px_rgba(255,107,0,0.2)]"
-              >
-                {busy
-                  ? <Loader2 size={16} className="animate-spin" />
-                  : isSetup
-                    ? <UserPlus size={16} />
-                    : <KeyRound size={16} />
-                }
-                {busy ? 'Please wait…' : isSetup ? 'Create & Sign In' : 'Sign In to Admin Panel'}
-              </button>
-            </div>
-
-            {/* Footer */}
-            <div className="px-8 pb-7 text-center space-y-2">
-              {/* Security badges */}
-              <div className="flex items-center justify-center gap-3 text-[10px] text-[rgba(245,245,245,0.2)] font-bold uppercase tracking-wider">
-                <span>PBKDF2-SHA256</span>
-                <span>·</span>
-                <span>8hr Session</span>
-                <span>·</span>
-                <span>Rate Limited</span>
-              </div>
-              <p className="text-[10px] text-[rgba(245,245,245,0.15)]">
-                Stored locally · not transmitted to any server
+              <h1 className="text-2xl font-extrabold text-white tracking-tight">Admin Panel</h1>
+              <p className="text-sm text-neutral-400 mt-1">
+                {mode === 'login'
+                  ? 'Sign in to manage products, orders, and more.'
+                  : 'Reset or set your admin password via email OTP.'}
               </p>
             </div>
-          </div>
 
-          {/* Appointment quick link */}
-          <p className="mt-5 text-center text-[11px] text-[rgba(245,245,245,0.2)]">
-            Customer booking?{' '}
-            <a href="/book" className="text-[rgba(255,107,0,0.5)] hover:text-[#FF6B00] font-semibold transition-colors">
-              Book an Appointment →
-            </a>
-          </p>
-        </motion.div>
+            <AnimatePresence mode="wait">
+              {mode === 'login' ? (
+                <LoginForm
+                  key="login"
+                  onSuccess={() => setAuthed(true)}
+                  onForgot={() => setMode('forgot')}
+                />
+              ) : (
+                <ForgotForm key="forgot" onBack={() => setMode('login')} />
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        <p className="text-center text-xs text-neutral-600 mt-6">
+          Muscle Mantra • Authorized personnel only
+        </p>
       </motion.div>
-    </AnimatePresence>
+    </div>
+  );
+}
+
+/* ─── Login ──────────────────────────────────────────────────────────────── */
+
+function LoginForm({ onSuccess, onForgot }: { onSuccess: () => void; onForgot: () => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setError('');
+    if (!email.trim() || !password) { setError('Please enter your email and password.'); return; }
+    setBusy(true);
+    const res = await signInAdmin(email, password);
+    setBusy(false);
+    if (res.ok) onSuccess();
+    else setError(res.error ?? 'Sign-in failed.');
+  }
+
+  return (
+    <motion.form
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -8 }}
+      transition={{ duration: 0.2 }}
+      onSubmit={submit}
+      className="space-y-4"
+    >
+      <Field icon={Mail} label="Email">
+        <input
+          type="email"
+          autoComplete="username"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="admin@musclemantra.shop"
+          className="w-full bg-transparent text-white placeholder:text-neutral-600 outline-none text-sm"
+        />
+      </Field>
+
+      <Field icon={Lock} label="Password">
+        <input
+          type={showPw ? 'text' : 'password'}
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••"
+          className="w-full bg-transparent text-white placeholder:text-neutral-600 outline-none text-sm"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPw((v) => !v)}
+          className="text-neutral-500 hover:text-neutral-300 transition"
+          aria-label={showPw ? 'Hide password' : 'Show password'}
+        >
+          {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </Field>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
+
+      <button
+        type="submit"
+        disabled={busy}
+        className="w-full flex items-center justify-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-60 text-neutral-950 font-bold py-3 text-sm transition"
+      >
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+        {busy ? 'Signing in…' : 'Sign In'}
+      </button>
+
+      <button
+        type="button"
+        onClick={onForgot}
+        className="w-full text-center text-xs text-neutral-400 hover:text-orange-400 transition"
+      >
+        Forgot / set password?
+      </button>
+    </motion.form>
+  );
+}
+
+/* ─── Forgot / OTP ───────────────────────────────────────────────────────── */
+
+function ForgotForm({ onBack }: { onBack: () => void }) {
+  const [step, setStep] = useState<ForgotStep>('email');
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function sendOtp(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setError('');
+    if (!email.trim()) { setError('Please enter your admin email.'); return; }
+    setBusy(true);
+    const res = await requestAdminOtp(email, 'reset');
+    setBusy(false);
+    if (res.ok) setStep('otp');
+    else setError(res.error ?? 'Could not send the code. Try again.');
+  }
+
+  async function submitReset(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setError('');
+    if (!/^\d{6}$/.test(otp.trim())) { setError('Enter the 6-digit code from your email.'); return; }
+    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+      setError('Password must be 8+ characters with a letter and a number.');
+      return;
+    }
+    if (password !== confirm) { setError('Passwords do not match.'); return; }
+    setBusy(true);
+    const res = await resetAdminPassword(email, otp, password);
+    setBusy(false);
+    if (res.ok) setStep('done');
+    else setError(res.error ?? 'Reset failed. Check the code and try again.');
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 8 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 8 }}
+      transition={{ duration: 0.2 }}
+    >
+      {step === 'email' && (
+        <form onSubmit={sendOtp} className="space-y-4">
+          <Field icon={Mail} label="Admin email">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@musclemantra.shop"
+              className="w-full bg-transparent text-white placeholder:text-neutral-600 outline-none text-sm"
+            />
+          </Field>
+          {error && <ErrorNote>{error}</ErrorNote>}
+          <p className="text-xs text-neutral-500">
+            We&apos;ll email a 6-digit code if this address belongs to an admin account.
+          </p>
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-60 text-neutral-950 font-bold py-3 text-sm transition"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+            {busy ? 'Sending…' : 'Send code'}
+          </button>
+        </form>
+      )}
+
+      {step === 'otp' && (
+        <form onSubmit={submitReset} className="space-y-4">
+          <Field icon={KeyRound} label="6-digit code">
+            <input
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+              className="w-full bg-transparent text-white placeholder:text-neutral-600 outline-none text-sm tracking-[0.3em]"
+            />
+          </Field>
+          <Field icon={Lock} label="New password">
+            <input
+              type={showPw ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-transparent text-white placeholder:text-neutral-600 outline-none text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw((v) => !v)}
+              className="text-neutral-500 hover:text-neutral-300 transition"
+              aria-label={showPw ? 'Hide password' : 'Show password'}
+            >
+              {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </Field>
+          <Field icon={Lock} label="Confirm password">
+            <input
+              type={showPw ? 'text' : 'password'}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-transparent text-white placeholder:text-neutral-600 outline-none text-sm"
+            />
+          </Field>
+          {error && <ErrorNote>{error}</ErrorNote>}
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-60 text-neutral-950 font-bold py-3 text-sm transition"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            {busy ? 'Saving…' : 'Set password'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setStep('email'); setError(''); }}
+            className="w-full text-center text-xs text-neutral-500 hover:text-neutral-300 transition"
+          >
+            Use a different email
+          </button>
+        </form>
+      )}
+
+      {step === 'done' && (
+        <div className="text-center py-4">
+          <div className="w-14 h-14 rounded-2xl bg-green-500/15 border border-green-500/30 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-7 h-7 text-green-400" />
+          </div>
+          <p className="text-white font-semibold">Password updated</p>
+          <p className="text-sm text-neutral-400 mt-1">You can now sign in with your new password.</p>
+          <button
+            onClick={onBack}
+            className="mt-6 w-full rounded-xl bg-orange-500 hover:bg-orange-400 text-neutral-950 font-bold py-3 text-sm transition"
+          >
+            Back to sign in
+          </button>
+        </div>
+      )}
+
+      {step !== 'done' && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="mt-4 w-full flex items-center justify-center gap-1.5 text-xs text-neutral-400 hover:text-orange-400 transition"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to sign in
+        </button>
+      )}
+    </motion.div>
+  );
+}
+
+/* ─── shared bits ────────────────────────────────────────────────────────── */
+
+function Field({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-neutral-400 mb-1.5 block">{label}</span>
+      <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-neutral-950/60 px-3.5 py-3 focus-within:border-orange-500/60 transition">
+        <Icon className="w-4 h-4 text-neutral-500 shrink-0" />
+        {children}
+      </div>
+    </label>
+  );
+}
+
+function ErrorNote({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.p
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"
+    >
+      {children}
+    </motion.p>
   );
 }
