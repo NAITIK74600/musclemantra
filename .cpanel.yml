@@ -1,0 +1,20 @@
+---
+# Muscle Mantra — cPanel Git Auto-Deploy
+# When you click "Update" in cPanel Git Version Control,
+# this script runs automatically and copies the built site to public_html/
+#
+# Repo location:   ~/repositories/musclemantra/  (or wherever cPanel cloned it)
+# Deploy target:   ~/public_html/
+#
+# IMPORTANT: This file MUST be at the repo root with the exact name .cpanel.yml
+# ------------------------------------------------------------------
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/$USER/public_html/
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/cp -R out/. $DEPLOYPATH
+    - /bin/chmod -R 755 $DEPLOYPATH
+    - /bin/find $DEPLOYPATH -type f -exec chmod 644 {} \;
+    - /bin/mkdir -p $DEPLOYPATH/uploads
+    - /bin/chmod 755 $DEPLOYPATH/uploads
+    - /bin/echo "Deployment complete — $(date)"
