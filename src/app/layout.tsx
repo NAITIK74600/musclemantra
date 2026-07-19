@@ -147,6 +147,15 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-black text-[#F5F5F5] overflow-x-hidden">
+        {/* Google Tag Manager (noscript) */}
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-5VK7MGFL"
+            height="0"
+            width="0"
+            style={{ display: "none", visibility: "hidden" }}
+          />
+        </noscript>
         <Analytics />
         <GoogleAuthProvider>
           <ToastProvider>

@@ -3,34 +3,26 @@
 import Script from 'next/script';
 
 /**
- * Google Analytics 4 (GA4)
+ * Google Tag Manager (GTM)
  * ------------------------------------------------------------------
- * 1. Go to https://analytics.google.com  → Admin → Create Property
- * 2. Add a "Web" data stream for https://musclemantra.shop
- * 3. Copy the "Measurement ID" (looks like  G-XXXXXXXXXX )
- * 4. Paste it below between the quotes and re-deploy.
+ * Container ID for musclemantra.shop.  Manage GA4, ads & other tags
+ * from https://tagmanager.google.com  (no code changes needed there).
  *
- * While this value is empty, nothing loads (zero performance cost).
+ * The matching <noscript> fallback lives at the top of <body> in
+ * src/app/layout.tsx.
  */
-const GA_MEASUREMENT_ID = ''; // e.g. 'G-XXXXXXXXXX'
+const GTM_ID = 'GTM-5VK7MGFL';
 
 export default function Analytics() {
-  if (!GA_MEASUREMENT_ID) return null;
+  if (!GTM_ID) return null;
 
   return (
-    <>
-      <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-        strategy="afterInteractive"
-      />
-      <Script id="ga4-init" strategy="afterInteractive">
-        {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', '${GA_MEASUREMENT_ID}');
-        `}
-      </Script>
-    </>
+    <Script id="gtm-init" strategy="afterInteractive">
+      {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','${GTM_ID}');`}
+    </Script>
   );
 }
