@@ -7,7 +7,7 @@ RewriteBase /
 RewriteRule ^api/db\.php$      - [F,L]
 RewriteRule ^api/_config\.php$ - [F,L]
 RewriteRule ^data/ - [F,L]
-RewriteRule ^setup/ - [F,L]
+# RewriteRule ^setup/ - [F,L]   # ⚠ TEMPORARILY DISABLED for one-time installer. Re-enable after running /setup/install.php AND delete setup/ folder.
 RewriteRule ^\..*$ - [F,L]
 
 # ── Security headers (requires mod_headers — works on most cPanels) ──────────
