@@ -1,20 +1,33 @@
 ---
 # Muscle Mantra — cPanel Git Auto-Deploy
-# When you click "Update" in cPanel Git Version Control,
-# this script runs automatically and copies the built site to public_html/
+# Runs when you click "Update from Remote" + "Deploy HEAD Commit"
+# in cPanel → Git Version Control.
 #
-# Repo location:   ~/repositories/musclemantra/  (or wherever cPanel cloned it)
-# Deploy target:   ~/public_html/
+# What it does:
+#   1. Copies out/* → ~/public_html/  (additive; does NOT delete files)
+#   2. Preserves _config.php  (has DB password)
+#   3. Preserves uploads/     (user-uploaded product images)
+#   4. Sets safe permissions
+#   5. Writes deploy timestamp + commit hash to deploy.log
 #
-# IMPORTANT: This file MUST be at the repo root with the exact name .cpanel.yml
+# The .cpanel.yml file MUST be at the repo root with this exact name.
 # ------------------------------------------------------------------
 deployment:
   tasks:
     - export DEPLOYPATH=/home/$USER/public_html/
     - /bin/mkdir -p $DEPLOYPATH
-    - /bin/cp -R out/. $DEPLOYPATH
-    - /bin/chmod -R 755 $DEPLOYPATH
-    - /bin/find $DEPLOYPATH -type f -exec chmod 644 {} \;
     - /bin/mkdir -p $DEPLOYPATH/uploads
-    - /bin/chmod 755 $DEPLOYPATH/uploads
-    - /bin/echo "Deployment complete — $(date)"
+    - /bin/mkdir -p $DEPLOYPATH/data
+    # Copy the freshly-built static site (additive: existing _config.php + uploads survive)
+    - /bin/cp -R out/. $DEPLOYPATH
+    # Directory perms 755, file perms 644 (standard shared-hosting safe values)
+    - /bin/find $DEPLOYPATH -type d -exec chmod 755 {} \;
+    - /bin/find $DEPLOYPATH -type f -exec chmod 644 {} \;
+    # uploads/ needs to stay writable so PHP admin can save product images
+    - /bin/chmod -R 775 $DEPLOYPATH/uploads
+    - /bin/chmod -R 775 $DEPLOYPATH/data
+    # Protect the config file (contains DB credentials)
+    - /bin/chmod 640 $DEPLOYPATH/_config.php 2>/dev/null || true
+    # Deploy log — visible via File Manager: public_html/deploy.log
+    - /bin/echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] deployed commit $(git -C $HOME/repositories/musclemantra rev-parse --short HEAD 2>/dev/null || echo unknown)" >> $DEPLOYPATH/deploy.log
+
