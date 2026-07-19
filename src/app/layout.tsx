@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import { Montserrat, Poppins } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import ConditionalChrome from "@/components/ConditionalChrome";
 import CartProvider from "@/components/CartProvider";
 import ToastProvider from "@/components/ToastProvider";
-import FloatingActions from "@/components/FloatingActions";
 import GoogleAuthProvider from "@/components/GoogleAuthProvider";
 
 const montserrat = Montserrat({
@@ -137,14 +135,11 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="min-h-full flex flex-col bg-black text-[#F5F5F5]">
+      <body className="min-h-full flex flex-col bg-black text-[#F5F5F5] overflow-x-hidden">
         <GoogleAuthProvider>
           <ToastProvider>
             <CartProvider>
-              <Navbar />
-              <main className="flex-1 pt-[104px]">{children}</main>
-              <Footer />
-              <FloatingActions />
+              <ConditionalChrome>{children}</ConditionalChrome>
             </CartProvider>
           </ToastProvider>
         </GoogleAuthProvider>

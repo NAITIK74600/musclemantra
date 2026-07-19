@@ -43,9 +43,9 @@ define('ALLOWED_STATUSES', [
 define('MAX_BODY_BYTES', 64 * 1024); // 64 KB
 
 // ── MySQL Database ───────────────────────────────────────────────────────
-// Fill these in from cPanel → MySQL Databases after running setup/install.php
+// Only DB_PASS needs to be filled. DB_NAME and DB_USER are pre-configured.
 define('DB_HOST', 'localhost');
 define('DB_PORT', '3306');
-define('DB_NAME', 'YOUR_CPANEL_USER_musclemantra'); // e.g. abc123_musclemantra
-define('DB_USER', 'YOUR_CPANEL_USER_dbuser');       // e.g. abc123_dbuser
-define('DB_PASS', 'YOUR_DB_PASSWORD');              // set in cPanel MySQL Databases
+define('DB_NAME', 'musclema_muscle');       // cPanel database name
+define('DB_USER', 'musclema_mmadmin');      // cPanel database user
+define('DB_PASS', 'PASTE_YOUR_DB_PASSWORD_HERE');  // ⚠ ONLY EDIT THIS LINE

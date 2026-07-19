@@ -46,6 +46,10 @@ next-env.d.ts
 # Markdown docs (internal only)
 *.md
 
+# Deploy artifacts
+*.zip
+/out/database.sql
+
 # Legacy flat-file storage
 public/data/
 

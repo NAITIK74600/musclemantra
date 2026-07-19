@@ -271,11 +271,11 @@ export default function Navbar() {
       <header className="fixed top-0 left-0 right-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.9)]">
         {/* â”€â”€ Row 1 â”€â”€ */}
         <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)]">
-          <div className="container-max py-2.5 flex items-center gap-3">
+          <div className="container-max py-2 lg:py-2.5 flex items-center gap-2 sm:gap-3">
 
             {/* Logo */}
             <Link href="/" className="flex items-center shrink-0">
-              <Image src="/logo.png" alt="Muscle Mantra" width={48} height={48} className="w-12 h-12 object-contain" priority />
+              <Image src="/logo.png" alt="Muscle Mantra" width={48} height={48} className="w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 object-contain" priority />
             </Link>
 
             {/* Location picker â€” Patna only */}
@@ -289,16 +289,18 @@ export default function Navbar() {
                   value={searchQuery}
                   onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
                   onFocus={() => setSearchOpen(true)}
-                  placeholder="Search supplements, brands..."
+                  placeholder="Search supplements..."
                   autoComplete="off"
                   aria-label="Search products"
-                  className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-lg pl-9 pr-24 py-2.5 text-[13px] text-white placeholder-[rgba(245,245,245,0.3)] outline-none focus:border-[rgba(255,107,0,0.5)] transition-colors"
+                  className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-lg pl-8 sm:pl-9 pr-11 sm:pr-24 py-2 sm:py-2.5 text-[12px] sm:text-[13px] text-white placeholder-[rgba(245,245,245,0.3)] outline-none focus:border-[rgba(255,107,0,0.5)] transition-colors"
                 />
                 <button
                   type="submit"
-                  className="absolute right-0 top-0 bottom-0 px-4 bg-[#FF6B00] hover:bg-[#E55A00] text-white rounded-r-lg text-xs font-bold transition-colors"
+                  aria-label="Search"
+                  className="absolute right-0 top-0 bottom-0 px-3 sm:px-4 bg-[#FF6B00] hover:bg-[#E55A00] text-white rounded-r-lg text-xs font-bold transition-colors flex items-center justify-center"
                 >
-                  SEARCH
+                  <Search size={14} className="sm:hidden" />
+                  <span className="hidden sm:inline">SEARCH</span>
                 </button>
               </form>
 
@@ -441,9 +443,9 @@ export default function Navbar() {
                   onMouseEnter={() => link.sub && setHoveredMenu(link.label)}
                   onMouseLeave={() => setHoveredMenu(null)}>
                   <Link href={link.href}
-                    className={`flex items-center gap-1 px-4 py-2.5 text-[11px] font-bold tracking-wider whitespace-nowrap transition-all text-[rgba(245,245,245,0.65)] hover:text-white hover:bg-[rgba(255,255,255,0.04)]`}>
+                    className={`flex items-center gap-1 px-2.5 sm:px-3 lg:px-4 py-2 lg:py-2.5 text-[10px] sm:text-[11px] font-bold tracking-wider whitespace-nowrap transition-all text-[rgba(245,245,245,0.65)] hover:text-white hover:bg-[rgba(255,255,255,0.04)]`}>
                     {link.label}
-                    {link.sub && <ChevronDown size={11} className={`transition-transform ${hoveredMenu === link.label ? 'rotate-180' : ''}`} />}
+                    {link.sub && <ChevronDown size={10} className={`transition-transform ${hoveredMenu === link.label ? 'rotate-180' : ''}`} />}
                   </Link>
                   {link.sub && hoveredMenu === link.label && (
                     <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}

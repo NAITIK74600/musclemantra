@@ -1,149 +1,106 @@
 ﻿import Link from 'next/link';
 import Image from 'next/image';
-import { Share2, Globe, Send, MapPin, Phone, Mail } from 'lucide-react';
+import { MapPin, Phone, Mail } from 'lucide-react';
 
 const footerLinks: Record<string, { label: string; href: string }[]> = {
-  Products: [
-    { label: 'Whey Protein', href: '/products?cat=protein' },
-    { label: 'Creatine', href: '/products?cat=creatine' },
-    { label: 'Pre-Workout', href: '/products?cat=pre-workout' },
-    { label: 'BCAA / EAA', href: '/products?cat=bcaa' },
-    { label: 'Fat Burner', href: '/products?cat=fat-burner' },
-    { label: 'Mass Gainer', href: '/products?cat=mass-gainer' },
+  Shop: [
+    { label: 'All Products', href: '/products' },
+    { label: 'Categories', href: '/categories' },
+    { label: 'Brands', href: '/brands' },
+    { label: 'Offers', href: '/offers' },
   ],
   Company: [
     { label: 'About Us', href: '/about' },
-    { label: 'Services', href: '/services' },
-    { label: 'Blogs', href: '/blogs' },
-    { label: 'Contact Us', href: '/contact' },
-    { label: 'Partner Stores', href: '/contact' },
-  ],
-  Support: [
+    { label: 'Contact', href: '/contact' },
     { label: 'Track Order', href: '/orders' },
-    { label: 'Refund & Returns', href: '/refund-policy' },
-    { label: 'Cancellation', href: '/cancellation-policy' },
-    { label: 'FAQ', href: '/contact' },
-    { label: 'Franchise', href: '/contact' },
   ],
   Legal: [
     { label: 'Privacy Policy', href: '/privacy-policy' },
     { label: 'Terms & Conditions', href: '/terms' },
     { label: 'Refund Policy', href: '/refund-policy' },
-    { label: 'Cancellation Policy', href: '/cancellation-policy' },
   ],
 };
 
 export default function Footer() {
   return (
-    <footer className="bg-[#0a0a0a] overflow-hidden">
+    <footer className="bg-[#0a0a0a] border-t border-[rgba(255,255,255,0.06)]">
+      <div className="container-max py-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
 
-      {/* ── Newsletter + Social ── */}
-      <div className="border-t border-b border-[rgba(255,255,255,0.06)] py-5">
-        <div className="container-max flex flex-col sm:flex-row items-center justify-between gap-5">
-
-          {/* Newsletter */}
-          <div className="w-full sm:w-auto flex flex-col gap-3">
-            <div className="text-center sm:text-left">
-              <p className="text-sm font-black text-white">JOIN THE MUSCLE ARMY</p>
-              <p className="text-[11px] text-[rgba(245,245,245,0.4)]">Get exclusive offers &amp; discounts</p>
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <input
-                placeholder="Enter your email"
-                className="flex-1 min-w-0 bg-[#111] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2.5 text-sm text-white placeholder-[rgba(245,245,245,0.3)] outline-none focus:border-[rgba(255,107,0,0.4)] transition-colors"
-              />
-              <button className="shrink-0 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-lg transition-all">
-                GO
-              </button>
-            </div>
-          </div>
-
-          {/* Social */}
-          <div className="flex items-center gap-3">
-            <p className="text-[10px] font-bold text-[rgba(245,245,245,0.35)] uppercase tracking-widest">Follow</p>
-            {[Share2, Globe, Send].map((Icon, i) => (
-              <a key={i} href="#" className="w-9 h-9 rounded-lg bg-[rgba(255,255,255,0.05)] flex items-center justify-center text-[rgba(245,245,245,0.5)] hover:bg-[#FF6B00] hover:text-white transition-all">
-                <Icon size={16} />
-              </a>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Main footer ── */}
-      <div className="container-max py-10 lg:py-14">
-        <div className="grid grid-cols-1 lg:grid-cols-6 gap-8 lg:gap-10">
-
-          {/* Brand column */}
+          {/* Brand + contact */}
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-flex items-center mb-4">
-              <Image src="/logo.png" alt="Muscle Mantra" width={56} height={56} className="w-14 h-14 object-contain" />
+            <Link href="/" className="inline-flex items-center gap-2 mb-4">
+              <Image src="/logo.png" alt="Muscle Mantra" width={44} height={44} className="w-11 h-11 object-contain" />
+              <span className="font-black text-lg text-white tracking-tight">MUSCLE MANTRA</span>
             </Link>
-            <p className="text-sm text-[rgba(245,245,245,0.5)] leading-relaxed mb-5 max-w-[280px]">
-              Patna's most trusted supplement store. 100% authentic products, delivered to your door.
+            <p className="text-sm text-[rgba(245,245,245,0.5)] leading-relaxed mb-4 max-w-[300px]">
+              Patna&apos;s trusted supplement store. 100% authentic products, fast delivery across India.
             </p>
-            <div className="flex flex-col gap-2.5 text-sm text-[rgba(245,245,245,0.45)]">
-              <a href="tel:+918409612737" className="flex items-center gap-2.5 hover:text-[#FF6B00] transition-colors">
-                <Phone size={13} className="shrink-0" /> +91 84096 12737
+            <div className="flex flex-col gap-2 text-sm text-[rgba(245,245,245,0.5)]">
+              <a href="tel:+918409612737" className="flex items-center gap-2 hover:text-[#FF6B00] transition-colors">
+                <Phone size={13} /> +91 84096 12737
               </a>
-              <a href="mailto:hello@musclemantra.in" className="flex items-center gap-2.5 hover:text-[#FF6B00] transition-colors">
-                <Mail size={13} className="shrink-0" /> hello@musclemantra.in
+              <a href="mailto:hello@musclemantra.in" className="flex items-center gap-2 hover:text-[#FF6B00] transition-colors">
+                <Mail size={13} /> hello@musclemantra.in
               </a>
-              <span className="flex items-start gap-2.5">
+              <span className="flex items-start gap-2">
                 <MapPin size={13} className="mt-0.5 shrink-0" />
-                <span>Tejpartap Nagar, Vrindavan Colony,<br />Anisabad, Patna – 800002, Bihar</span>
+                <span>Anisabad, Patna – 800002, Bihar</span>
               </span>
             </div>
           </div>
 
-          {/* Links — 2-col grid on mobile, 4-col on lg */}
-          <div className="lg:col-span-4 grid grid-cols-2 sm:grid-cols-4 gap-6">
-            {Object.entries(footerLinks).map(([category, links]) => (
-              <div key={category}>
-                <h4 className="text-[10px] font-bold tracking-[0.15em] uppercase text-[rgba(245,245,245,0.35)] mb-3.5 pb-2 border-b border-[rgba(255,255,255,0.05)]">
-                  {category}
-                </h4>
-                <ul className="flex flex-col gap-2">
-                  {links.map(link => (
-                    <li key={link.label}>
-                      <Link
-                        href={link.href}
-                        className="text-[12px] text-[rgba(245,245,245,0.45)] hover:text-[#FF6B00] hover:translate-x-0.5 inline-block transition-all leading-snug"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+          {/* Link columns */}
+          {Object.entries(footerLinks).map(([category, links]) => (
+            <div key={category}>
+              <h4 className="text-[11px] font-bold tracking-widest uppercase text-white mb-4">{category}</h4>
+              <ul className="flex flex-col gap-2.5">
+                {links.map(link => (
+                  <li key={link.label}>
+                    <Link
+                      href={link.href}
+                      className="text-sm text-[rgba(245,245,245,0.5)] hover:text-[#FF6B00] transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
-        {/* ── Bottom bar ── */}
-        <div className="mt-10 pt-6 border-t border-[rgba(255,255,255,0.05)]">
-          {/* Trust badges — mobile scrollable row */}
-          <div className="flex items-center justify-center gap-3 mb-5 flex-wrap">
-            {['FSSAI Licensed', '100% Authentic', 'Secure Payments', 'GMP Certified'].map(badge => (
-              <span key={badge} className="px-3 py-1 rounded-full border border-[rgba(255,255,255,0.08)] text-[10px] font-bold text-[rgba(245,245,245,0.35)] uppercase tracking-wide">
-                {badge}
-              </span>
-            ))}
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-[rgba(245,245,245,0.25)] text-center">
-            <div>
-              <p>© 2026 Muscle Mantra. All rights reserved.</p>
-              <p className="mt-0.5">Operated by <span className="text-[rgba(245,245,245,0.4)]">Amarjeet Kumar</span> &nbsp;·&nbsp; Anisabad, Patna – 800002</p>
-            </div>
-            <Link href="/admin" className="hover:text-[#FF6B00] transition-colors shrink-0">
-              Admin Panel
-            </Link>
+        {/* Bottom bar */}
+        <div className="mt-10 pt-6 border-t border-[rgba(255,255,255,0.06)] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-[rgba(245,245,245,0.35)] text-center sm:text-left">
+            © 2026 Muscle Mantra. All rights reserved.
+          </p>
+          <div className="flex items-center gap-3">
+            <a
+              href="https://www.instagram.com/musclemantra"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Instagram"
+              className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.05)] flex items-center justify-center text-[rgba(245,245,245,0.5)] hover:bg-[#FF6B00] hover:text-white transition-all"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+                <path d="M12 2.2c3.2 0 3.6 0 4.85.07 1.17.05 1.8.25 2.23.42.56.22.96.48 1.38.9.42.42.68.82.9 1.38.17.42.37 1.06.42 2.23.06 1.25.07 1.65.07 4.85s0 3.6-.07 4.85c-.05 1.17-.25 1.8-.42 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.17-1.06.37-2.23.42-1.25.06-1.65.07-4.85.07s-3.6 0-4.85-.07c-1.17-.05-1.8-.25-2.23-.42a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.17-.42-.37-1.06-.42-2.23C2.2 15.6 2.2 15.2 2.2 12s0-3.6.07-4.85c.05-1.17.25-1.8.42-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.17 1.06-.37 2.23-.42C8.4 2.2 8.8 2.2 12 2.2M12 0C8.74 0 8.33 0 7.05.07 5.78.13 4.9.33 4.14.63c-.8.31-1.47.72-2.15 1.4C1.31 2.7.9 3.37.59 4.17.29 4.93.09 5.81.03 7.08.03 8.36 0 8.77 0 12s0 3.64.07 4.92c.06 1.27.26 2.15.56 2.91.31.8.72 1.47 1.4 2.15.68.68 1.35 1.09 2.15 1.4.76.3 1.64.5 2.91.56C8.36 24 8.77 24 12 24s3.64 0 4.92-.07c1.27-.06 2.15-.26 2.91-.56.8-.31 1.47-.72 2.15-1.4.68-.68 1.09-1.35 1.4-2.15.3-.76.5-1.64.56-2.91C24 15.64 24 15.23 24 12s0-3.64-.07-4.92c-.06-1.27-.26-2.15-.56-2.91a5.9 5.9 0 0 0-1.4-2.15A5.9 5.9 0 0 0 19.83.63c-.76-.3-1.64-.5-2.91-.56C15.64 0 15.23 0 12 0m0 5.84A6.16 6.16 0 1 0 12 18.16 6.16 6.16 0 0 0 12 5.84m0 10.16A4 4 0 1 1 12 8a4 4 0 0 1 0 8m6.4-11.85a1.44 1.44 0 1 0 0 2.88 1.44 1.44 0 0 0 0-2.88"/>
+              </svg>
+            </a>
+            <a
+              href="https://www.facebook.com/musclemantra"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Facebook"
+              className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.05)] flex items-center justify-center text-[rgba(245,245,245,0.5)] hover:bg-[#FF6B00] hover:text-white transition-all"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+                <path d="M24 12A12 12 0 1 0 10.13 23.85V15.47H7.08V12h3.05V9.36c0-3 1.79-4.67 4.53-4.67 1.31 0 2.68.23 2.68.23v2.95h-1.51c-1.49 0-1.96.93-1.96 1.88V12h3.33l-.53 3.47h-2.8v8.38A12 12 0 0 0 24 12"/>
+              </svg>
+            </a>
           </div>
         </div>
       </div>
     </footer>
   );
 }
-
-
