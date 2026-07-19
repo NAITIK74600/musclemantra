@@ -11,7 +11,13 @@
 </IfModule>
 
 # Block direct access to config and helper files
-<FilesMatch "^(_config|db)\.php$">
+<FilesMatch "^(_config|db|env)\.php$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block direct access to the secrets file (.env / .env.example)
+<FilesMatch "^\.env">
     Order allow,deny
     Deny from all
 </FilesMatch>
