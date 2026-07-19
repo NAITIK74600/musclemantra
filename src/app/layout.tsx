@@ -59,10 +59,8 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 
-  // Google Search Console verification
-  verification: {
-    google: "ceec13777cf24feb",
-  },
+  // Google Search Console verification is handled via the HTML file
+  // /public/googleceec13777cf24feb.html (HTML file method).
 
   // Open Graph (Facebook, WhatsApp, etc.)
   openGraph: {
