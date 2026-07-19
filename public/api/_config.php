@@ -36,7 +36,10 @@ define('DELIVERY_KEY', mm_env('DELIVERY_KEY', 'muscle-rider-2025'));
 // ── Email ─────────────────────────────────────────────────────────────────
 define('MAIL_FROM',      mm_env('MAIL_FROM',      'noreply@musclemantra.shop'));
 define('MAIL_FROM_NAME', mm_env('MAIL_FROM_NAME', 'Muscle Mantra'));
-define('MAIL_REPLY_TO',  mm_env('MAIL_REPLY_TO',  'admin@musclemantra.shop'));
+define('MAIL_REPLY_TO',  mm_env('MAIL_REPLY_TO',  'ordersupport@musclemantra.shop'));
+
+// Where internal alerts (new orders etc.) are sent.
+define('ADMIN_NOTIFY_EMAIL', mm_env('ADMIN_NOTIFY_EMAIL', 'admin@musclemantra.shop'));
 
 // ── Owner (super-admin) ───────────────────────────────────────────────────
 // The owner always logs in with this email; password lives in api/.env.

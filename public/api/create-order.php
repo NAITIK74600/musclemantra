@@ -61,10 +61,11 @@ try {
 // Send order-confirmation email (best-effort — never blocks the order).
 require_once __DIR__ . "/mailer.php";
 try {
-    mm_order_email([
+    $emailPayload = [
         "id"             => $oid,
         "customer_name"  => $clean($d["name"] ?? ($addr["name"] ?? "")),
         "customer_email" => $clean($d["email"] ?? ""),
+        "customer_phone" => $clean($d["phone"] ?? ""),
         "total"          => (float)$d["total"],
         "status"         => $status,
         "payment_method" => $clean($d["paymentMethod"] ?? $d["payment"] ?? "cod"),
@@ -73,7 +74,9 @@ try {
         "city"           => $clean($addr["city"] ?? ""),
         "state"          => $clean($addr["state"] ?? ""),
         "pincode"        => $clean($addr["pincode"] ?? ""),
-    ], "confirmation");
+    ];
+    mm_order_email($emailPayload, "confirmation");   // → customer
+    mm_order_admin_alert($emailPayload);              // → admin@ (new-order alert)
 } catch (Throwable $e) { /* email failure must not fail the order */ }
 
 ok(["ok" => true, "id" => $oid, "invoice" => $invNum], 201);
