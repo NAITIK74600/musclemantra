@@ -454,7 +454,7 @@ export default function CheckoutClient() {
   return (
     <div className="min-h-screen bg-[#050505]">
       {/* Page header */}
-      <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)] py-5">
+      <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)] py-8 sm:py-10">
         <div className="container-max">
           <div className="flex items-center gap-3 mb-2">
             <Link href="/cart" className="text-[rgba(245,245,245,0.4)] hover:text-white transition-colors">

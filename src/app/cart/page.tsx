@@ -29,7 +29,7 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-[#050505]">
-      <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)] py-5">
+      <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)] py-9 sm:py-12">
         <div className="container-max">
           <h1 className="font-[var(--font-montserrat)] font-black text-3xl text-white">
             Your <span className="text-gradient">Cart</span>

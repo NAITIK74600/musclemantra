@@ -72,7 +72,7 @@ function ProductsPageInner() {
   return (
     <div className="min-h-screen bg-[#050505]">
       {/* Header */}
-      <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)] py-6">
+      <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)] py-9 sm:py-12">
         <div className="container-max">
           <h1 className="font-[var(--font-montserrat)] font-black text-3xl sm:text-4xl text-white mb-2">
             All <span className="text-gradient">Products</span>

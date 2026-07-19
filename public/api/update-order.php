@@ -17,6 +17,12 @@ $chk->execute([$id]);
 $order = $chk->fetch();
 if (!$order) fail("Order not found", 404);
 
+// A delivered order was already received — it cannot be cancelled.
+// Use "Returned" for post-delivery issues instead.
+if (($order["status"] ?? "") === "Delivered" && $status === "Cancelled") {
+    fail("A delivered order can't be cancelled — mark it 'Returned' instead.", 409);
+}
+
 $db->prepare("UPDATE orders SET status=?, updated_at=NOW() WHERE id=?")->execute([$status, $id]);
 
 // ── Notify the customer by email (best-effort) ────────────────────────────

@@ -411,6 +411,17 @@ function AdminDashboard() {
   }, [orderList, toast]);
 
   const updateOrderStatus = useCallback(async (id: string, status: string) => {
+    const current = orderList.find(o => o.id === id);
+    // A delivered order was already received by the customer — it can't be
+    // "cancelled". Use "Returned" instead for post-delivery issues.
+    if (current?.status === 'Delivered' && status === 'Cancelled') {
+      toast.push({
+        variant: 'error',
+        title: 'Delivered order can’t be cancelled',
+        description: 'The customer already received this order. Mark it “Returned” instead.',
+      });
+      return;
+    }
     await fetch('/api/update-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
@@ -418,7 +429,7 @@ function AdminDashboard() {
     });
     setOrderList(prev => prev.map(o => o.id === id ? { ...o, status } : o));
     toast.push({ variant: 'success', title: `Order updated: ${status}` });
-  }, [ADMIN_KEY_VAL, toast]);
+  }, [ADMIN_KEY_VAL, orderList, toast]);
 
   const resendOrderEmail = useCallback(async (id: string) => {
     toast.push({ variant: 'info', title: `Resending email for #${id}…` });
