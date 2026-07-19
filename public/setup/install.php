@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Muscle Mantra — Database Setup Script
  * Run ONCE after uploading to cPanel:  https://musclemantra.shop/setup/install.php
@@ -24,7 +24,7 @@ require_once dirname(__DIR__) . '/api/_config.php';
 $results = [];
 $errors  = [];
 
-function step(string $label, callable $fn) use (&$results, &$errors): void {
+$step = function(string $label, callable $fn) use (&$results, &$errors): void {
     try { $fn(); $results[] = "✅ $label"; }
     catch (Throwable $e) { $errors[] = "❌ $label: " . $e->getMessage(); }
 }
@@ -42,7 +42,7 @@ try {
 
 // ── Create tables ─────────────────────────────────────────────────────────
 
-step('Create table: users', fn() => $pdo->exec("
+$step('Create table: users', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS users (
         id           CHAR(36)     NOT NULL PRIMARY KEY,
         name         VARCHAR(100) NOT NULL,
@@ -58,7 +58,7 @@ step('Create table: users', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: sessions', fn() => $pdo->exec("
+$step('Create table: sessions', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS sessions (
         token      CHAR(64)  NOT NULL PRIMARY KEY,
         user_id    CHAR(36)  NOT NULL,
@@ -68,7 +68,7 @@ step('Create table: sessions', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: products', fn() => $pdo->exec("
+$step('Create table: products', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS products (
         id            VARCHAR(50)  NOT NULL PRIMARY KEY,
         name          VARCHAR(255) NOT NULL,
@@ -95,7 +95,7 @@ step('Create table: products', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: orders', fn() => $pdo->exec("
+$step('Create table: orders', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS orders (
         id             VARCHAR(50)  NOT NULL PRIMARY KEY,
         user_id        CHAR(36)     DEFAULT NULL,
@@ -120,7 +120,7 @@ step('Create table: orders', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: transactions', fn() => $pdo->exec("
+$step('Create table: transactions', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS transactions (
         id             INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         order_id       VARCHAR(50)  NOT NULL,
@@ -135,7 +135,7 @@ step('Create table: transactions', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: invoices', fn() => $pdo->exec("
+$step('Create table: invoices', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS invoices (
         id             INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         invoice_number VARCHAR(60)  NOT NULL UNIQUE,
@@ -147,7 +147,7 @@ step('Create table: invoices', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: images', fn() => $pdo->exec("
+$step('Create table: images', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS images (
         id            INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         filename      VARCHAR(255) NOT NULL,
@@ -164,7 +164,7 @@ step('Create table: images', fn() => $pdo->exec("
 "));
 
 // ── E-commerce catalog tables ────────────────────────────────────────────
-step('Create table: categories', fn() => $pdo->exec("
+$step('Create table: categories', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS categories (
         id          VARCHAR(50)  NOT NULL PRIMARY KEY,
         name        VARCHAR(100) NOT NULL,
@@ -179,7 +179,7 @@ step('Create table: categories', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: brands', fn() => $pdo->exec("
+$step('Create table: brands', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS brands (
         id          VARCHAR(50)  NOT NULL PRIMARY KEY,
         name        VARCHAR(100) NOT NULL,
@@ -194,7 +194,7 @@ step('Create table: brands', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: reviews', fn() => $pdo->exec("
+$step('Create table: reviews', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS reviews (
         id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         product_id   VARCHAR(50)  NOT NULL,
@@ -213,7 +213,7 @@ step('Create table: reviews', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: wishlist', fn() => $pdo->exec("
+$step('Create table: wishlist', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS wishlist (
         id         INT         NOT NULL AUTO_INCREMENT PRIMARY KEY,
         user_id    CHAR(36)    NOT NULL,
@@ -225,7 +225,7 @@ step('Create table: wishlist', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: cart', fn() => $pdo->exec("
+$step('Create table: cart', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS cart (
         id         INT         NOT NULL AUTO_INCREMENT PRIMARY KEY,
         user_id    CHAR(36)    NOT NULL,
@@ -240,7 +240,7 @@ step('Create table: cart', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: addresses', fn() => $pdo->exec("
+$step('Create table: addresses', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS addresses (
         id          INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         user_id     CHAR(36)     NOT NULL,
@@ -258,7 +258,7 @@ step('Create table: addresses', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: coupons', fn() => $pdo->exec("
+$step('Create table: coupons', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS coupons (
         id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         code         VARCHAR(50)  NOT NULL UNIQUE,
@@ -276,7 +276,7 @@ step('Create table: coupons', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: subscriptions', fn() => $pdo->exec("
+$step('Create table: subscriptions', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS subscriptions (
         id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         user_id      CHAR(36)     NOT NULL,
@@ -292,7 +292,7 @@ step('Create table: subscriptions', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: newsletter', fn() => $pdo->exec("
+$step('Create table: newsletter', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS newsletter (
         id         INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         email      VARCHAR(255) NOT NULL UNIQUE,
@@ -302,7 +302,7 @@ step('Create table: newsletter', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: contact_messages', fn() => $pdo->exec("
+$step('Create table: contact_messages', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS contact_messages (
         id         INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         name       VARCHAR(100) NOT NULL,
@@ -315,7 +315,7 @@ step('Create table: contact_messages', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Create table: appointments', fn() => $pdo->exec("
+$step('Create table: appointments', fn() => $pdo->exec("
     CREATE TABLE IF NOT EXISTS appointments (
         id             INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
         user_id        CHAR(36)     DEFAULT NULL,
@@ -332,7 +332,7 @@ step('Create table: appointments', fn() => $pdo->exec("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 "));
 
-step('Add category_id/brand_id columns to products', function() use ($pdo) {
+$step('Add category_id/brand_id columns to products', function() use ($pdo) {
     // Add columns if they don't exist (MySQL 8+ supports IF NOT EXISTS, but for safety we try/catch)
     try { $pdo->exec("ALTER TABLE products ADD COLUMN category_id VARCHAR(50) DEFAULT NULL"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE products ADD COLUMN brand_id VARCHAR(50) DEFAULT NULL"); } catch (Exception $e) {}
@@ -341,7 +341,7 @@ step('Add category_id/brand_id columns to products', function() use ($pdo) {
 });
 
 // ── Create uploads directory ──────────────────────────────────────────────
-step('Create uploads/ directory', function() {
+$step('Create uploads/ directory', function() {
     $dir = dirname(__DIR__) . '/uploads/';
     if (!is_dir($dir)) mkdir($dir, 0755, true);
     // Prevent directory listing
@@ -353,7 +353,7 @@ step('Create uploads/ directory', function() {
 });
 
 // ── Seed products ─────────────────────────────────────────────────────────
-step('Seed products (8 default products)', function() use ($pdo) {
+$step('Seed products (8 default products)', function() use ($pdo) {
     $ins = $pdo->prepare(
         'INSERT IGNORE INTO products
          (id,name,brand,category,price,original_price,discount,rating,review_count,
@@ -408,7 +408,7 @@ step('Seed products (8 default products)', function() use ($pdo) {
 });
 
 // ── Seed categories ──────────────────────────────────────────────────────
-step('Seed categories (8 categories)', function() use ($pdo) {
+$step('Seed categories (8 categories)', function() use ($pdo) {
     $ins = $pdo->prepare(
         'INSERT IGNORE INTO categories (id,name,slug,icon,color,sort_order) VALUES (?,?,?,?,?,?)'
     );
@@ -426,7 +426,7 @@ step('Seed categories (8 categories)', function() use ($pdo) {
 });
 
 // ── Seed brands ──────────────────────────────────────────────────────────
-step('Seed brands (8 brands)', function() use ($pdo) {
+$step('Seed brands (8 brands)', function() use ($pdo) {
     $ins = $pdo->prepare(
         'INSERT IGNORE INTO brands (id,name,slug,country,is_featured) VALUES (?,?,?,?,?)'
     );
@@ -444,7 +444,7 @@ step('Seed brands (8 brands)', function() use ($pdo) {
 });
 
 // ── Seed welcome coupons ─────────────────────────────────────────────────
-step('Seed welcome coupons (3 default codes)', function() use ($pdo) {
+$step('Seed welcome coupons (3 default codes)', function() use ($pdo) {
     $ins = $pdo->prepare(
         'INSERT IGNORE INTO coupons
          (code, description, discount_type, discount_value, min_amount, max_discount, is_active)
@@ -459,7 +459,7 @@ step('Seed welcome coupons (3 default codes)', function() use ($pdo) {
 });
 
 // ── Link products to their category and brand ────────────────────────────
-step('Link products to categories & brands', function() use ($pdo) {
+$step('Link products to categories & brands', function() use ($pdo) {
     // Set category_id = category slug (already matches)
     $pdo->exec("UPDATE products SET category_id = category WHERE category_id IS NULL AND category IS NOT NULL");
     // Set brand_id from brand name by matching brand slug
