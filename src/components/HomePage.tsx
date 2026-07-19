@@ -100,9 +100,31 @@ function SectionHeader({
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────
+   SEO / OAUTH INTRO BANNER
+   Plain HTML (no framer motion, no opacity tricks) — the very
+   first thing Google's crawler + OAuth verification bot sees.
+   Contains the app name, purpose, and explicit "no login" line.
+   ───────────────────────────────────────────────────────────── */
+function IntroBanner() {
+  return (
+    <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)]">
+      <div className="container-max py-2.5 sm:py-3">
+        <p className="text-center text-[11.5px] sm:text-[12.5px] text-white/70 leading-snug">
+          <strong className="text-[#FF6B00] font-bold">Muscle Mantra</strong>
+          <span className="text-white/40 mx-1.5">·</span>
+          <span>Online supplement store — buy authentic whey protein, creatine &amp; pre-workout.</span>
+          <span className="hidden sm:inline text-white/40 mx-1.5">·</span>
+          <span className="hidden sm:inline text-white/50">No login required to browse.</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
    HERO
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────── */
 const HERO_IMAGES = ['/hero-1.jpg', '/hero-2.jpg'];
 
 function HeroSection() {
@@ -146,11 +168,11 @@ function HeroSection() {
               <span className="text-[10.5px] sm:text-[11px] font-semibold text-white/90 tracking-wide">100% Authentic · Patna&apos;s Supplement Store</span>
             </ClientMotion>
 
-            {/* Headline — H1 includes brand name "Muscle Mantra" so it matches OAuth app name */}
+            {/* Headline — H1 explicitly starts with "Muscle Mantra" (both cases) to match OAuth app name */}
             <ClientMotion as="h1" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.6 }}
               className="font-[var(--font-montserrat)] font-black uppercase leading-[0.95] tracking-tight mb-4 sm:mb-5 text-white">
-              <span className="block text-[#FF6B00] text-[13px] sm:text-[14px] font-black tracking-[0.28em] mb-2 sm:mb-3">
-                MUSCLE MANTRA
+              <span className="block text-[#FF6B00] text-[15px] sm:text-[16px] font-black tracking-[0.28em] mb-2 sm:mb-3">
+                Muscle Mantra
               </span>
               <span className="block" style={{ fontSize: 'clamp(2.25rem, 5.4vw + 0.5rem, 5rem)' }}>
                 Fuel Your<br />
@@ -161,7 +183,7 @@ function HeroSection() {
             {/* Subcopy — clearly explains the app's purpose for OAuth verification */}
             <ClientMotion as="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
               className="text-white/70 text-[14.5px] sm:text-base md:text-lg mb-6 sm:mb-7 leading-relaxed max-w-lg">
-              <strong className="text-white/90 font-semibold">Muscle Mantra</strong> is India&apos;s trusted online supplement store. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA from top brands — delivered to your door.
+              <strong className="text-white/90 font-semibold">Muscle Mantra</strong> is an online supplement e-commerce store based in India. Browse and buy 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA — no login required to shop.
             </ClientMotion>
 
             {/* CTAs */}
@@ -680,6 +702,7 @@ function AboutStrip() {
 export default function HomePage() {
   return (
     <>
+      <IntroBanner />
       <HeroSection />
       <TrustStrip />
       <AboutStrip />
