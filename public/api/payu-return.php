@@ -12,7 +12,7 @@
  *  4. Redirect to /checkout/success/ or /checkout/failure/ with params
  */
 
-require_once __DIR__ . '/_config.php';
+require_once __DIR__ . '/db.php';
 
 // Only allow POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -52,23 +52,24 @@ $hashValid    = hash_equals($computedHash, strtolower($receivedHash));
 // ── Sanitise txnid before using in JSON (alphanumeric + MM prefix only) ──
 $safeTxnid = preg_replace('/[^A-Za-z0-9]/', '', $txnid);
 
-// ── Update order status in JSON ───────────────────────────────────────────
+// ── Update order status in MySQL ─────────────────────────────────────────
 if ($safeTxnid && $hashValid) {
-    $dataFile = dirname(__DIR__) . '/data/orders.json';
-    if (file_exists($dataFile)) {
-        $orders = json_decode(file_get_contents($dataFile), true) ?? [];
-        $newStatus = (strtolower($status) === 'success') ? 'Payment Received' : 'Payment Failed';
-        foreach ($orders as &$order) {
-            if ($order['id'] === $safeTxnid) {
-                $order['status']    = $newStatus;
-                $order['mihpayid']  = $mihpayid;
-                $order['updatedAt'] = date('c');
-                break;
-            }
-        }
-        unset($order);
-        file_put_contents($dataFile, json_encode($orders, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
-    }
+    $newStatus = (strtolower($status) === 'success') ? 'Payment Received' : 'Payment Failed';
+    try {
+        $db = getDB();
+        $db->prepare("UPDATE orders SET status=?, updated_at=NOW() WHERE id=?")
+           ->execute([$newStatus, $safeTxnid]);
+        // Record transaction
+        $db->prepare(
+            "INSERT INTO transactions (order_id, txn_id, amount, status, payment_method, hash_verified, payu_response)
+             VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status), payu_response=VALUES(payu_response)"
+        )->execute([
+            $safeTxnid, $mihpayid, $amount,
+            strtolower($status) === 'success' ? 'success' : 'failed',
+            'payu', $hashValid ? 1 : 0,
+            json_encode($_POST),
+        ]);
+    } catch (Exception $e) { /* log silently */ }
 }
 
 // ── Redirect to React page ────────────────────────────────────────────────

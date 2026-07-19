@@ -1,19 +1,13 @@
-'use client';
+﻿'use client';
 
-// Lightweight client-side auth backed by localStorage. This is a front-end demo
-// (no backend), so accounts + sessions live in the browser.
-//
-// Security posture (v2):
-//   • Passwords hashed with PBKDF2-SHA256 + per-user random salt (WebCrypto).
-//   • Sessions carry an expiry timestamp (30 days) — expired sessions self-clear.
-//   • Sign-in attempts are rate-limited (5 per 15 min per email).
-//   • Avatar URLs are sanitized before write to block `javascript:` / non-image
-//     `data:` payloads (DOM-XSS via image src).
+/**
+ * Muscle Mantra — Auth module
+ * Backed by PHP/MySQL API. Token stored in localStorage, user cached for instant reads.
+ */
 
-import {
-  hashPassword, verifyPassword, sanitizeImageUrl,
-  loginLockoutRemaining, recordFailedLogin, clearLoginAttempts,
-} from './security';
+const TOKEN_KEY = 'mb_token_v3';
+const USER_KEY  = 'mb_user_v3';
+const EVENT     = 'mb-auth-change';
 
 export type User = {
   id: string;
@@ -22,278 +16,179 @@ export type User = {
   phone?: string;
   avatar?: string;
   provider: 'email' | 'google';
+  isAdmin?: boolean;
   createdAt: number;
 };
 
-type StoredUser = User & { pwHash?: string };
-type Session = { userId: string; expiresAt: number };
+// ── Token / cache helpers ──────────────────────────────────────────────────
 
-const USERS_KEY = 'mb_users_v2';
-const SESSION_KEY = 'mb_session_v2';
-const EVENT = 'mb-auth-change';
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-function uid(): string {
-  // Prefer WebCrypto UUIDs when available for less predictable IDs.
-  const c = typeof globalThis.crypto !== 'undefined' ? globalThis.crypto : undefined;
-  if (c?.randomUUID) return c.randomUUID();
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
-
-function readUsers(): StoredUser[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(USERS_KEY);
-    return raw ? (JSON.parse(raw) as StoredUser[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeUsers(users: StoredUser[]) {
-  if (typeof window === 'undefined') return;
-  try { window.localStorage.setItem(USERS_KEY, JSON.stringify(users)); }
-  catch { /* quota exceeded — ignore */ }
-}
-
-function readSession(): Session | null {
+export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw) as Session;
-    if (!s?.userId || !s?.expiresAt) return null;
-    return s;
-  } catch { return null; }
+  return localStorage.getItem(TOKEN_KEY);
 }
 
-function setSession(userId: string | null) {
+function saveSession(token: string, user: User): void {
   if (typeof window === 'undefined') return;
-  if (userId) {
-    const s: Session = { userId, expiresAt: Date.now() + SESSION_TTL_MS };
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(s));
-  } else {
-    window.localStorage.removeItem(SESSION_KEY);
-  }
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
   broadcast();
 }
 
-function broadcast() {
+function clearSession(): void {
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(EVENT));
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  broadcast();
 }
 
-function publicUser(u: StoredUser): User {
-  // Strip credential material before returning.
-  const { pwHash: _pwHash, ...rest } = u;
-  void _pwHash;
-  return rest;
+function broadcast(): void {
+  if (typeof window !== 'undefined')
+    window.dispatchEvent(new CustomEvent(EVENT));
 }
 
-/** Validates an email loosely (RFC-lite — good enough for a UX check). */
-function isValidEmail(e: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-}
-
-/** Validates a password: 8+ chars, at least one letter and one digit. */
-function isValidPassword(p: string): { ok: true } | { ok: false; error: string } {
-  if (p.length < 8) return { ok: false, error: 'Password must be at least 8 characters.' };
-  if (p.length > 128) return { ok: false, error: 'Password is too long (max 128).' };
-  if (!/[A-Za-z]/.test(p) || !/\d/.test(p)) {
-    return { ok: false, error: 'Password must contain at least one letter and one number.' };
-  }
-  return { ok: true };
-}
-
-/** Returns the currently signed-in user, or null. Auto-clears expired sessions. */
+/** Synchronous — reads from localStorage cache. Fast, no API call. */
 export function getCurrentUser(): User | null {
   if (typeof window === 'undefined') return null;
-  const s = readSession();
-  if (!s) return null;
-  if (s.expiresAt < Date.now()) {
-    window.localStorage.removeItem(SESSION_KEY);
-    return null;
-  }
-  const u = readUsers().find(x => x.id === s.userId);
-  return u ? publicUser(u) : null;
-}
-
-/** Create a new email/password account and sign in. */
-export async function signUp(name: string, email: string, password: string): Promise<{ ok: boolean; error?: string; user?: User }> {
-  const cleanName = name.trim();
-  const cleanEmail = email.trim().toLowerCase();
-
-  if (!cleanName) return { ok: false, error: 'Please enter your name.' };
-  if (cleanName.length > 80) return { ok: false, error: 'Name is too long.' };
-  if (!isValidEmail(cleanEmail)) return { ok: false, error: 'Please enter a valid email.' };
-
-  const pwCheck = isValidPassword(password);
-  if (!pwCheck.ok) return { ok: false, error: pwCheck.error };
-
-  const users = readUsers();
-  if (users.some(u => u.email === cleanEmail)) {
-    return { ok: false, error: 'An account with this email already exists.' };
-  }
-
-  let pwHash: string;
+  if (!getToken()) return null;
   try {
-    pwHash = await hashPassword(password);
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch { return null; }
+}
+
+/** Subscribe to login/logout events. Returns unsubscribe fn. */
+export function onAuthChange(cb: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener(EVENT, cb);
+  return () => window.removeEventListener(EVENT, cb);
+}
+
+// ── API helpers ────────────────────────────────────────────────────────────
+
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = { 'Content-Type': 'application/json' };
+  const t = getToken();
+  if (t) h['Authorization'] = `Bearer ${t}`;
+  return h;
+}
+
+async function apiPost<T>(
+  path: string,
+  payload: unknown,
+  withAuth = false,
+): Promise<{ ok: boolean; data?: T; error?: string }> {
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: withAuth ? authHeaders() : { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data?.error || 'Request failed.' };
+    return { ok: true, data };
   } catch {
-    return { ok: false, error: 'Your browser does not support secure sign-up. Please update your browser.' };
+    return { ok: false, error: 'Network error. Please check your connection.' };
   }
-
-  const user: StoredUser = {
-    id: uid(),
-    name: cleanName,
-    email: cleanEmail,
-    provider: 'email',
-    pwHash,
-    createdAt: Date.now(),
-  };
-  users.push(user);
-  writeUsers(users);
-  setSession(user.id);
-  clearLoginAttempts(cleanEmail);
-  return { ok: true, user: publicUser(user) };
 }
 
-/** Sign in with email/password. Rate-limited per email. */
-export async function signIn(email: string, password: string): Promise<{ ok: boolean; error?: string; user?: User }> {
-  const cleanEmail = email.trim().toLowerCase();
-  if (!isValidEmail(cleanEmail)) return { ok: false, error: 'Please enter a valid email.' };
-  if (!password) return { ok: false, error: 'Please enter your password.' };
+// ── Auth operations ────────────────────────────────────────────────────────
 
-  const lockMs = loginLockoutRemaining(cleanEmail);
-  if (lockMs > 0) {
-    const mins = Math.ceil(lockMs / 60_000);
-    return { ok: false, error: `Too many attempts. Try again in ~${mins} minute${mins === 1 ? '' : 's'}.` };
-  }
-
-  const users = readUsers();
-  const u = users.find(x => x.email === cleanEmail);
-
-  // Uniform error message avoids leaking which emails are registered.
-  const genericError = 'Incorrect email or password.';
-
-  if (!u) {
-    recordFailedLogin(cleanEmail);
-    return { ok: false, error: genericError };
-  }
-  if (u.provider === 'google' && !u.pwHash) {
-    return { ok: false, error: 'This account uses Google sign-in. Continue with Google instead.' };
-  }
-  if (!u.pwHash) {
-    recordFailedLogin(cleanEmail);
-    return { ok: false, error: genericError };
-  }
-
-  let ok = false;
-  try { ok = await verifyPassword(password, u.pwHash); }
-  catch { ok = false; }
-
-  if (!ok) {
-    const remaining = recordFailedLogin(cleanEmail);
-    if (remaining > 0) {
-      const mins = Math.ceil(remaining / 60_000);
-      return { ok: false, error: `Too many attempts. Try again in ~${mins} minute${mins === 1 ? '' : 's'}.` };
-    }
-    return { ok: false, error: genericError };
-  }
-
-  clearLoginAttempts(cleanEmail);
-  setSession(u.id);
-  return { ok: true, user: publicUser(u) };
+export async function signUp(
+  name: string,
+  email: string,
+  password: string,
+): Promise<{ ok: boolean; error?: string; user?: User }> {
+  const res = await apiPost<{ token: string; user: User }>(
+    '/api/auth/register', { name, email, password },
+  );
+  if (!res.ok || !res.data) return { ok: false, error: res.error };
+  saveSession(res.data.token, res.data.user);
+  return { ok: true, user: res.data.user };
 }
 
-/**
- * Sign in with a real Google profile (from @react-oauth/google userinfo endpoint).
- * Creates or merges the account in localStorage.
- */
-export function signInWithGoogleProfile(profile: {
+export async function signIn(
+  email: string,
+  password: string,
+): Promise<{ ok: boolean; error?: string; user?: User }> {
+  const res = await apiPost<{ token: string; user: User }>(
+    '/api/auth/login', { email, password },
+  );
+  if (!res.ok || !res.data) return { ok: false, error: res.error };
+  saveSession(res.data.token, res.data.user);
+  return { ok: true, user: res.data.user };
+}
+
+export async function signInWithGoogleProfile(profile: {
   sub: string;
   email: string;
   name: string;
   picture?: string;
   email_verified?: boolean;
-}): { ok: boolean; error?: string; user?: User } {
-  if (!profile.email || profile.email_verified === false) {
-    return { ok: false, error: 'Google account email is not verified.' };
+}): Promise<{ ok: boolean; error?: string; user?: User }> {
+  const res = await apiPost<{ token: string; user: User }>(
+    '/api/auth/google', profile,
+  );
+  if (!res.ok || !res.data) return { ok: false, error: res.error };
+  saveSession(res.data.token, res.data.user);
+  return { ok: true, user: res.data.user };
+}
+
+/** Sign out immediately (clears cache), notifies server in background. */
+export function signOut(): void {
+  const token = getToken();
+  clearSession();
+  if (token) {
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    }).catch(() => {});
   }
-  const cleanEmail = profile.email.trim().toLowerCase();
-  const users = readUsers();
-  let u = users.find(x => x.email === cleanEmail);
+}
 
-  if (u) {
-    // Update Google profile data silently
-    u.name = u.name || profile.name;
-    if (profile.picture) u.avatar = sanitizeImageUrl(profile.picture);
-    const idx = users.findIndex(x => x.email === cleanEmail);
-    users[idx] = u;
-    writeUsers(users);
-  } else {
-    u = {
-      id: uid(),
-      name: profile.name,
-      email: cleanEmail,
-      provider: 'google',
-      avatar: profile.picture ? sanitizeImageUrl(profile.picture) : undefined,
-      createdAt: Date.now(),
-    };
-    users.push(u);
-    writeUsers(users);
+/** Validate session with server and refresh cached user. Call on app mount. */
+export async function refreshUser(): Promise<User | null> {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const res = await fetch('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) { clearSession(); return null; }
+    const { user } = (await res.json()) as { user: User };
+    if (typeof window !== 'undefined') localStorage.setItem(USER_KEY, JSON.stringify(user));
+    return user;
+  } catch {
+    return getCurrentUser();
   }
-
-  setSession(u.id);
-  return { ok: true, user: publicUser(u) };
 }
 
-/** Sign the current user out. */
-export function signOut() {
-  setSession(null);
+export async function updateProfile(
+  patch: Partial<Pick<User, 'name' | 'phone' | 'avatar'>>,
+): Promise<User | null> {
+  const res = await apiPost<{ user: User }>('/api/auth/profile', patch, true);
+  if (!res.ok || !res.data) return null;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(USER_KEY, JSON.stringify(res.data.user));
+    broadcast();
+  }
+  return res.data.user;
 }
 
-/** Update the signed-in user's profile fields. Sanitizes avatar URL. */
-export function updateProfile(patch: Partial<Pick<User, 'name' | 'phone' | 'avatar'>>): User | null {
-  const current = getCurrentUser();
-  if (!current) return null;
-  const users = readUsers();
-  const idx = users.findIndex(u => u.id === current.id);
-  if (idx === -1) return null;
+// ── Utility functions ──────────────────────────────────────────────────────
 
-  const clean: Partial<Pick<User, 'name' | 'phone' | 'avatar'>> = {};
-  if (patch.name !== undefined) clean.name = patch.name.trim().slice(0, 80);
-  if (patch.phone !== undefined) clean.phone = patch.phone.trim().slice(0, 20);
-  if (patch.avatar !== undefined) clean.avatar = sanitizeImageUrl(patch.avatar);
-
-  users[idx] = { ...users[idx], ...clean };
-  writeUsers(users);
-  broadcast();
-  return publicUser(users[idx]);
-}
-
-/** Subscribe to auth changes (sign in/out, profile updates). Returns an unsubscribe fn. */
-export function onAuthChange(cb: () => void): () => void {
-  if (typeof window === 'undefined') return () => {};
-  const handler = () => cb();
-  window.addEventListener(EVENT, handler);
-  window.addEventListener('storage', handler);
-  return () => {
-    window.removeEventListener(EVENT, handler);
-    window.removeEventListener('storage', handler);
-  };
-}
-
-/** Initials for avatar fallback. */
-export function initials(name: string): string {
+export function initials(userOrName: User | string): string {
+  const name = typeof userOrName === 'string' ? userOrName : (userOrName.name || userOrName.email);
   return name
-    .trim()
     .split(/\s+/)
-    .slice(0, 2)
     .map(w => w[0]?.toUpperCase() ?? '')
+    .slice(0, 2)
     .join('');
 }
 
-/** Sanitize an avatar URL for safe `<img src>` usage. */
-export function safeAvatar(url: string | undefined): string | undefined {
-  return sanitizeImageUrl(url);
+export function safeAvatar(userOrUrl: User | string | null | undefined): string | null {
+  const url = typeof userOrUrl === 'string' ? userOrUrl
+    : (userOrUrl != null ? userOrUrl.avatar : null);
+  if (!url) return null;
+  if (url.startsWith('https://') || /^data:image\/(png|jpeg|webp|gif);base64,/.test(url)) return url;
+  return null;
 }

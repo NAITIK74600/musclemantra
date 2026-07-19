@@ -41,3 +41,11 @@ define('ALLOWED_STATUSES', [
 
 // ── Max request body size (bytes) ────────────────────────────────────────
 define('MAX_BODY_BYTES', 64 * 1024); // 64 KB
+
+// ── MySQL Database ───────────────────────────────────────────────────────
+// Fill these in from cPanel → MySQL Databases after running setup/install.php
+define('DB_HOST', 'localhost');
+define('DB_PORT', '3306');
+define('DB_NAME', 'YOUR_CPANEL_USER_musclemantra'); // e.g. abc123_musclemantra
+define('DB_USER', 'YOUR_CPANEL_USER_dbuser');       // e.g. abc123_dbuser
+define('DB_PASS', 'YOUR_DB_PASSWORD');              // set in cPanel MySQL Databases

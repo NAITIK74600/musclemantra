@@ -4,8 +4,10 @@ RewriteEngine On
 RewriteBase /
 
 # ── Security: block sensitive files ──────────────────────────────────────────
+RewriteRule ^api/db\.php$      - [F,L]
 RewriteRule ^api/_config\.php$ - [F,L]
 RewriteRule ^data/ - [F,L]
+RewriteRule ^setup/ - [F,L]
 RewriteRule ^\..*$ - [F,L]
 
 # ── Security headers (requires mod_headers — works on most cPanels) ──────────

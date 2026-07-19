@@ -47,7 +47,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           sub: string; email: string; name: string;
           picture?: string; email_verified?: boolean;
         };
-        const result = signInWithGoogleProfile(profile);
+        const result = await signInWithGoogleProfile(profile);
         if (!result.ok) { setError(result.error || 'Google sign-in failed.'); return; }
         router.push('/account');
       } catch {
