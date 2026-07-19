@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="mm-grad" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF8C3A"/>
+      <stop offset="1" stop-color="#E55A00"/>
+    </linearGradient>
+    <linearGradient id="mm-shine" x1="0" y1="0" x2="0" y2="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded orange badge -->
+  <rect x="8" y="8" width="184" height="184" rx="40" fill="url(#mm-grad)"/>
+  <rect x="8" y="8" width="184" height="184" rx="40" fill="url(#mm-shine)"/>
+  <!-- Dumbbell -->
+  <g fill="#fff">
+    <!-- left weight -->
+    <rect x="22" y="72" width="18" height="56" rx="4"/>
+    <rect x="40" y="60" width="14" height="80" rx="4"/>
+    <!-- bar -->
+    <rect x="54" y="94" width="92" height="12" rx="3"/>
+    <!-- right weight -->
+    <rect x="146" y="60" width="14" height="80" rx="4"/>
+    <rect x="160" y="72" width="18" height="56" rx="4"/>
+  </g>
+  <!-- MM monogram bottom accent -->
+  <text x="100" y="172" text-anchor="middle" font-family="Impact, 'Arial Black', sans-serif" font-size="26" font-weight="900" fill="#fff" letter-spacing="4">MM</text>
+</svg>

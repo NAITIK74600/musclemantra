@@ -1,1 +1,14 @@
-<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <defs>
+    <linearGradient id="mm-win" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF8C3A"/>
+      <stop offset="1" stop-color="#E55A00"/>
+    </linearGradient>
+  </defs>
+  <rect x="2.5" y="3.5" width="19" height="17" rx="3" fill="url(#mm-win)"/>
+  <rect x="2.5" y="3.5" width="19" height="5" rx="3" fill="#000" fill-opacity="0.25"/>
+  <circle cx="5.5" cy="6" r="0.8" fill="#fff"/>
+  <circle cx="7.8" cy="6" r="0.8" fill="#fff"/>
+  <circle cx="10.1" cy="6" r="0.8" fill="#fff"/>
+  <text x="12" y="16.5" text-anchor="middle" font-family="Impact, 'Arial Black', sans-serif" font-size="6.5" font-weight="900" fill="#fff" letter-spacing="0.5">MM</text>
+</svg>
