@@ -63,6 +63,14 @@ define('SMTP_SECURE', mm_env('SMTP_SECURE', 'ssl'));   // 'ssl' (465) or 'tls' (
 define('SMTP_USER',   mm_env('SMTP_USER',   'noreply@musclemantra.shop'));
 define('SMTP_PASS',   mm_env('SMTP_PASS',   ''));       // set this in api/.env
 
+// Optional: a SEPARATE password for the ordersupport@ mailbox. If you set
+// SMTP_ORDER_PASS in api/.env, order emails will truly authenticate & send
+// AS ordersupport@. If you leave it blank, order emails still go out through
+// the noreply@ account above but simply SHOW ordersupport@ as the sender
+// (same domain, so delivery is unaffected). Either way works.
+define('SMTP_ORDER_USER', mm_env('SMTP_ORDER_USER', MAIL_ORDER_FROM));
+define('SMTP_ORDER_PASS', mm_env('SMTP_ORDER_PASS', ''));
+
 // ── Site URL (no trailing slash) ─────────────────────────────────────────
 define('SITE_URL', mm_env('SITE_URL', 'https://musclemantra.shop'));
 

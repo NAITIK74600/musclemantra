@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Printer, ArrowLeft, Package } from 'lucide-react';
+import { Printer, ArrowLeft, Package, Download, Loader2 } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -86,6 +86,7 @@ export default function InvoiceClient() {
   const orderId = params?.orderId as string;
   const [order, setOrder] = useState<Order | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!orderId || orderId === '_') { setNotFound(true); return; }
@@ -140,6 +141,124 @@ export default function InvoiceClient() {
     ? dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
     : '—';
 
+  // Lazy-load jsPDF from CDN and build a clean, text-based invoice PDF.
+  const loadJsPDF = (): Promise<any> => new Promise((resolve, reject) => {
+    const w = window as unknown as { jspdf?: { jsPDF: unknown } };
+    if (w.jspdf?.jsPDF) { resolve(w.jspdf.jsPDF); return; }
+    const existing = document.getElementById('jspdf-cdn') as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener('load', () => resolve((window as unknown as { jspdf: { jsPDF: unknown } }).jspdf.jsPDF));
+      existing.addEventListener('error', reject);
+      return;
+    }
+    const s = document.createElement('script');
+    s.id = 'jspdf-cdn';
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.async = true;
+    s.onload = () => resolve((window as unknown as { jspdf: { jsPDF: unknown } }).jspdf.jsPDF);
+    s.onerror = reject;
+    document.body.appendChild(s);
+  });
+
+  const downloadPDF = async () => {
+    if (!order) return;
+    setDownloading(true);
+    try {
+      const JsPDF = await loadJsPDF();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const doc = new (JsPDF as any)({ unit: 'pt', format: 'a4' });
+      const W = doc.internal.pageSize.getWidth();
+      const M = 40;
+      const rupee = (n: number) => 'Rs. ' + Number(n || 0).toLocaleString('en-IN');
+      let y = 48;
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor('#FF6B00');
+      doc.text('MUSCLE MANTRA', M, y);
+      doc.setFontSize(10); doc.setTextColor('#111');
+      doc.text('TAX INVOICE', W - M, y, { align: 'right' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor('#666');
+      y += 16;
+      doc.text('Authentic Supplements · Patna', M, y);
+      doc.text(`Invoice #${order.id}`, W - M, y, { align: 'right' });
+      y += 13;
+      doc.text('musclemantra.shop', M, y);
+      doc.text(`Date: ${date}`, W - M, y, { align: 'right' });
+
+      y += 22;
+      doc.setDrawColor('#e5e5e5'); doc.line(M, y, W - M, y); y += 20;
+
+      const a = order.shippingAddress;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor('#111');
+      doc.text('Billed / Delivered to', M, y);
+      doc.text('Order details', W / 2 + 10, y);
+      y += 14;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor('#333');
+      const addrLines = [
+        a?.name, a?.phone, a?.email,
+        [a?.address, a?.area].filter(Boolean).join(', '),
+        [a?.city, a?.state, a?.pincode].filter(Boolean).join(', '),
+      ].filter(Boolean) as string[];
+      const infoLines = [
+        `Status: ${order.status}`,
+        `Payment: ${PM_LABELS[order.paymentMethod] ?? order.paymentMethod ?? '—'}`,
+      ];
+      const rows = Math.max(addrLines.length, infoLines.length);
+      for (let i = 0; i < rows; i++) {
+        if (addrLines[i]) doc.text(String(addrLines[i]), M, y);
+        if (infoLines[i]) doc.text(String(infoLines[i]), W / 2 + 10, y);
+        y += 13;
+      }
+
+      y += 12;
+      // Items table header
+      doc.setFillColor('#111'); doc.rect(M, y - 12, W - 2 * M, 20, 'F');
+      doc.setTextColor('#fff'); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.text('Item', M + 8, y + 2);
+      doc.text('Qty', W - M - 170, y + 2, { align: 'right' });
+      doc.text('Price', W - M - 90, y + 2, { align: 'right' });
+      doc.text('Total', W - M - 8, y + 2, { align: 'right' });
+      y += 22;
+
+      doc.setFont('helvetica', 'normal'); doc.setTextColor('#222');
+      (order.items ?? []).forEach((it) => {
+        const line = doc.splitTextToSize(it.name || 'Item', W - 2 * M - 200);
+        doc.text(line, M + 8, y);
+        doc.text(String(it.quantity), W - M - 170, y, { align: 'right' });
+        doc.text(rupee(it.price), W - M - 90, y, { align: 'right' });
+        doc.text(rupee(it.price * it.quantity), W - M - 8, y, { align: 'right' });
+        y += Math.max(16, line.length * 12);
+        doc.setDrawColor('#eee'); doc.line(M, y - 6, W - M, y - 6);
+      });
+
+      y += 8;
+      const totalsX = W - M - 8;
+      const labelX = W - M - 150;
+      const totRow = (label: string, val: string, bold = false) => {
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setFontSize(bold ? 11 : 9);
+        doc.setTextColor(bold ? '#FF6B00' : '#333');
+        doc.text(label, labelX, y, { align: 'right' });
+        doc.text(val, totalsX, y, { align: 'right' });
+        y += bold ? 20 : 15;
+      };
+      totRow('Subtotal', rupee(subtotal));
+      if (order.discount) totRow('Discount', '- ' + rupee(order.discount));
+      totRow('Shipping', order.shipping ? rupee(order.shipping) : 'FREE');
+      totRow('Grand Total', rupee(order.total), true);
+
+      y += 10;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor('#999');
+      doc.text('Thank you for shopping with Muscle Mantra! For help, reply to your order email.', M, y);
+
+      doc.save(`Invoice-${order.id}.pdf`);
+    } catch {
+      // Fallback to the browser print dialog (Save as PDF).
+      window.print();
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <>
       {/* Toolbar — hidden on print */}
@@ -148,12 +267,22 @@ export default function InvoiceClient() {
           <Link href="/orders" className="inline-flex items-center gap-2 text-sm text-[rgba(245,245,245,0.5)] hover:text-white transition-colors">
             <ArrowLeft size={15} /> My Orders
           </Link>
-          <button
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-5 py-2 bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold rounded-xl text-sm transition-all"
-          >
-            <Printer size={15} /> Print / Save PDF
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={downloadPDF}
+              disabled={downloading}
+              className="inline-flex items-center gap-2 px-5 py-2 bg-[#FF6B00] hover:bg-[#E55A00] disabled:opacity-60 text-white font-bold rounded-xl text-sm transition-all"
+            >
+              {downloading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+              {downloading ? 'Preparing…' : 'Download PDF'}
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.12)] text-white font-bold rounded-xl text-sm transition-all"
+            >
+              <Printer size={15} /> Print
+            </button>
+          </div>
         </div>
       </div>
 

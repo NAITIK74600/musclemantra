@@ -57,6 +57,14 @@ if (!function_exists('mm_send_mail')) {
         if (!filter_var($from, FILTER_VALIDATE_EMAIL))    $from    = MAIL_FROM;
         if (!filter_var($replyTo, FILTER_VALIDATE_EMAIL)) $replyTo = $from;
 
+        // If the caller is sending "from" ordersupport@ AND a dedicated password
+        // is configured, authenticate as that mailbox so the mail truly comes
+        // from it. Otherwise everything goes out through the noreply@ account.
+        if ($from === MAIL_ORDER_FROM && defined('SMTP_ORDER_PASS') && SMTP_ORDER_PASS !== '') {
+            $user = SMTP_ORDER_USER;
+            $pass = SMTP_ORDER_PASS;
+        }
+
         if (!$host || !$user || !$pass) return false;
         if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
 

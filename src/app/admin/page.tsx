@@ -420,6 +420,25 @@ function AdminDashboard() {
     toast.push({ variant: 'success', title: `Order updated: ${status}` });
   }, [ADMIN_KEY_VAL, toast]);
 
+  const resendOrderEmail = useCallback(async (id: string) => {
+    toast.push({ variant: 'info', title: `Resending email for #${id}…` });
+    try {
+      const res = await fetch('/api/resend-order-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.sent) {
+        toast.push({ variant: 'success', title: 'Email resent', description: `Sent to ${data.to}` });
+      } else {
+        toast.push({ variant: 'error', title: 'Could not resend', description: data?.error || 'Check SMTP settings' });
+      }
+    } catch {
+      toast.push({ variant: 'error', title: 'Network error while resending' });
+    }
+  }, [ADMIN_KEY_VAL, toast]);
+
   const deleteOrder = useCallback(async (id: string) => {
     if (!confirm(`Delete order #${id}? This permanently removes it.`)) return;
     try {
@@ -1440,6 +1459,10 @@ function AdminDashboard() {
                                 className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all inline-flex">
                                 <Eye size={13} />
                               </a>
+                              <button onClick={() => resendOrderEmail(o.id)} title="Resend order email to customer"
+                                className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all">
+                                <Mail size={13} />
+                              </button>
                               <button onClick={() => deleteOrder(o.id)} title="Delete order"
                                 className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all">
                                 <Trash2 size={13} />
