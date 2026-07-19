@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Banknote, Smartphone, CreditCard, Landmark, ShoppingBag,
   ChevronRight, CheckCircle, MapPin, User, Phone, Package,
-  Lock, ArrowLeft, Truck, LogIn,
+  Lock, ArrowLeft, Truck, LogIn, Navigation, X,
 } from 'lucide-react';
 import { useCart } from '@/components/CartProvider';
 import { getCurrentUser, getToken, onAuthChange, type User as AuthUser } from '@/lib/auth';
@@ -100,6 +100,77 @@ export default function CheckoutClient() {
   });
   const [errors, setErrors] = useState<Partial<ShippingForm>>({});
   const [apiError, setApiError] = useState<string | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<ShippingForm[]>([]);
+  const [locating, setLocating] = useState(false);
+
+  // Load saved address book (autofill).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('mb_addresses');
+      if (raw) {
+        const list = JSON.parse(raw) as ShippingForm[];
+        if (Array.isArray(list)) setSavedAddresses(list);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const addrKey = (a: ShippingForm) => `${a.address}|${a.pincode}|${a.phone}`.trim().toLowerCase();
+
+  const persistAddress = (a: ShippingForm) => {
+    try {
+      const existing: ShippingForm[] = JSON.parse(localStorage.getItem('mb_addresses') || '[]');
+      const deduped = [a, ...existing.filter(x => addrKey(x) !== addrKey(a))].slice(0, 5);
+      localStorage.setItem('mb_addresses', JSON.stringify(deduped));
+      setSavedAddresses(deduped);
+    } catch { /* ignore */ }
+  };
+
+  const applyAddress = (a: ShippingForm) => {
+    setForm(f => ({ ...f, ...a }));
+    setErrors({});
+  };
+
+  const removeAddress = (a: ShippingForm) => {
+    const next = savedAddresses.filter(x => addrKey(x) !== addrKey(a));
+    setSavedAddresses(next);
+    try { localStorage.setItem('mb_addresses', JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  // Auto-fill address fields from the device GPS (best-effort reverse geocode).
+  const detectLocation = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setApiError('Location is not supported on this device.');
+      return;
+    }
+    setLocating(true);
+    setApiError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+            { headers: { Accept: 'application/json' } },
+          );
+          const data = await res.json();
+          const a = data.address || {};
+          setForm(f => ({
+            ...f,
+            address: f.address || [a.house_number, a.road, a.neighbourhood, a.suburb].filter(Boolean).join(', '),
+            city: a.city || a.town || a.village || a.county || f.city,
+            state: a.state || f.state,
+            pincode: a.postcode || f.pincode,
+          }));
+        } catch {
+          setApiError('Could not detect your address. Please enter it manually.');
+        } finally {
+          setLocating(false);
+        }
+      },
+      () => { setLocating(false); setApiError('Location permission denied.'); },
+      { enableHighAccuracy: true, timeout: 12000 },
+    );
+  };
 
   // ── Auth gate ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -219,6 +290,7 @@ export default function CheckoutClient() {
         }
         cacheOrderId(txnid);
         clearCart();
+        persistAddress(form);
         setOrderId(txnid);
         setLoading(false);
         setStep('success');
@@ -270,6 +342,7 @@ export default function CheckoutClient() {
       cacheOrderId(txnid);
 
       clearCart();
+      persistAddress(form);
 
       // Build the PayU form and submit it programmatically
       const siteUrl = window.location.origin;
@@ -407,10 +480,52 @@ export default function CheckoutClient() {
           <div className="lg:col-span-3 space-y-6">
             {/* Shipping address */}
             <div className="p-6 bg-[#0d0d0d] rounded-2xl border border-[rgba(255,255,255,0.07)]">
-              <div className="flex items-center gap-2 mb-5">
-                <MapPin size={16} className="text-[#FF6B00]" />
-                <h2 className="font-[var(--font-montserrat)] font-bold text-white text-[15px]">Shipping Address</h2>
+              <div className="flex items-center justify-between gap-3 mb-5">
+                <div className="flex items-center gap-2">
+                  <MapPin size={16} className="text-[#FF6B00]" />
+                  <h2 className="font-[var(--font-montserrat)] font-bold text-white text-[15px]">Shipping Address</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={detectLocation}
+                  disabled={locating}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[rgba(255,107,0,0.1)] hover:bg-[rgba(255,107,0,0.18)] border border-[rgba(255,107,0,0.25)] text-[#FF6B00] text-[11px] font-bold transition-all disabled:opacity-60"
+                >
+                  <Navigation size={13} className={locating ? 'animate-spin' : ''} />
+                  {locating ? 'Detecting…' : 'Use my location'}
+                </button>
               </div>
+
+              {/* Saved addresses — tap to autofill */}
+              {savedAddresses.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-[11px] font-bold tracking-wide uppercase text-[rgba(245,245,245,0.4)] mb-2">Saved addresses</p>
+                  <div className="flex flex-wrap gap-2">
+                    {savedAddresses.map((a, i) => (
+                      <div
+                        key={i}
+                        className="group flex items-center gap-2 pl-3 pr-2 py-2 rounded-xl bg-[#111] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,107,0,0.35)] transition-all"
+                      >
+                        <button type="button" onClick={() => applyAddress(a)} className="text-left">
+                          <span className="block text-[12px] font-semibold text-white leading-tight">{a.name || 'Address'}</span>
+                          <span className="block text-[11px] text-[rgba(245,245,245,0.45)] leading-tight truncate max-w-[180px]">
+                            {[a.address, a.area, a.pincode].filter(Boolean).join(', ')}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeAddress(a)}
+                          aria-label="Remove saved address"
+                          className="p-1 rounded-md text-[rgba(245,245,245,0.3)] hover:text-red-400 hover:bg-red-500/10 transition-all"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
                   <Field label="Full Name" value={form.name} onChange={set('name')} placeholder="Amarjeet Kumar" error={errors.name} required />

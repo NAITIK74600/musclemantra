@@ -29,7 +29,7 @@ import {
 
 const sidebarItems = [
   { id: 'dashboard',     icon: LayoutDashboard,  label: 'Dashboard' },
-  { id: 'orders',        icon: ShoppingCart,      label: 'Orders',          badge: 'live' },
+  { id: 'orders',        icon: ShoppingCart,      label: 'Orders' },
   { id: 'products',      icon: Box,               label: 'Products' },
   { id: 'categories',    icon: LayoutGrid,        label: 'Categories' },
   { id: 'promotions',    icon: Megaphone,         label: 'Promotions' },
@@ -40,7 +40,7 @@ const sidebarItems = [
   { id: 'reports',       icon: BarChart2,         label: 'Sales & Reports' },
   { id: 'coupons',       icon: Tag,               label: 'Coupons' },
   { id: 'reviews',       icon: Star,              label: 'Reviews' },
-  { id: 'support',       icon: HeadphonesIcon,    label: 'Support Tickets', badge: '5' },
+  { id: 'support',       icon: HeadphonesIcon,    label: 'Support Tickets' },
   { id: 'cms',           icon: FileText,          label: 'CMS' },
   { id: 'admins',        icon: Shield,            label: 'Admins',          ownerOnly: true },
   { id: 'settings',      icon: Settings,          label: 'Settings' },
@@ -344,6 +344,71 @@ function AdminDashboard() {
   }, [ADMIN_KEY_VAL]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  // Realtime-ish: refresh orders every 20s so badges/status stay live.
+  useEffect(() => {
+    const t = setInterval(() => { fetchOrders(); }, 20000);
+    return () => clearInterval(t);
+  }, [fetchOrders]);
+
+  // ── New-order alert: sound + toast + desktop notification ────────────────
+  const knownOrderIdsRef = useRef<Set<string>>(new Set());
+  const ordersHydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const ids = new Set(orderList.map(o => o.id));
+    if (!ordersHydratedRef.current) {
+      knownOrderIdsRef.current = ids;
+      ordersHydratedRef.current = true;
+      return;
+    }
+    const fresh = orderList.filter(o => !knownOrderIdsRef.current.has(o.id));
+    knownOrderIdsRef.current = ids;
+    if (fresh.length === 0) return;
+
+    // Chime (Web Audio — no asset needed): two quick beeps.
+    try {
+      const AC = window.AudioContext
+        || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AC();
+      const beep = (freq: number, start: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + 0.3);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + 0.32);
+      };
+      beep(880, 0);
+      beep(1175, 0.18);
+      setTimeout(() => ctx.close().catch(() => {}), 800);
+    } catch { /* audio unavailable */ }
+
+    const first = fresh[0];
+    toast.push({
+      variant: 'success',
+      title: fresh.length === 1 ? 'New order received!' : `${fresh.length} new orders received!`,
+      description: `#${first.id} · ${first.shippingAddress.name || 'Customer'} · ₹${first.total.toLocaleString('en-IN')}`,
+    });
+
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      try {
+        new Notification('Muscle Mantra · New order', {
+          body: `#${first.id} · ₹${first.total.toLocaleString('en-IN')}`,
+        });
+      } catch { /* ignore */ }
+    }
+  }, [orderList, toast]);
 
   const updateOrderStatus = useCallback(async (id: string, status: string) => {
     await fetch('/api/update-order', {
@@ -697,11 +762,19 @@ function AdminDashboard() {
               {!sidebarCollapsed && (
                 <>
                   <span className="font-medium">{item.label}</span>
-                  {item.badge && (
-                    <span className="ml-auto bg-[#FF6B00] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                      {item.id === 'orders' ? (orderList.length || '0') : item.badge}
-                    </span>
-                  )}
+                  {(() => {
+                    const n =
+                      item.id === 'orders'
+                        ? orderList.filter(o => !['Delivered', 'Cancelled', 'Returned'].includes(o.status)).length
+                        : item.id === 'support'
+                        ? ticketList.filter(t => t.status === 'open').length
+                        : 0;
+                    return n > 0 ? (
+                      <span className="ml-auto bg-[#FF6B00] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                        {n}
+                      </span>
+                    ) : null;
+                  })()}
                 </>
               )}
             </button>
@@ -709,6 +782,11 @@ function AdminDashboard() {
         </nav>
 
         <div className="p-3 border-t border-[rgba(255,255,255,0.06)]">
+          <a href="/delivery" target="_blank" rel="noreferrer"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-[12px] text-[rgba(245,245,245,0.5)] hover:text-[#FF6B00] transition-all rounded-lg hover:bg-[rgba(255,107,0,0.08)]">
+            <Truck size={14} />
+            {!sidebarCollapsed && <span>Delivery Panel</span>}
+          </a>
           <button onClick={() => { signOutAdmin(); window.location.reload(); }}
             className="w-full flex items-center gap-3 px-3 py-2.5 text-[12px] text-[rgba(245,245,245,0.4)] hover:text-red-400 transition-all rounded-lg hover:bg-red-500/5">
             <LogOut size={14} />

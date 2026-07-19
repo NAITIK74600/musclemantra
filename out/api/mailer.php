@@ -254,5 +254,49 @@ if (!function_exists('mm_send_mail')) {
 
         return mm_send_mail($email, $subject, $html);
     }
+
+    /**
+     * Internal alert to the store admin when a new order comes in.
+     * Sends to ADMIN_NOTIFY_EMAIL. Best-effort — returns false on any issue.
+     */
+    function mm_order_admin_alert(array $o): bool {
+        $to = ADMIN_NOTIFY_EMAIL;
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
+
+        $id     = htmlspecialchars((string)($o['id'] ?? ''), ENT_QUOTES);
+        $name   = htmlspecialchars((string)($o['customer_name'] ?? $o['name'] ?? '—'), ENT_QUOTES);
+        $phone  = htmlspecialchars((string)($o['customer_phone'] ?? $o['phone'] ?? '—'), ENT_QUOTES);
+        $emailC = htmlspecialchars((string)($o['customer_email'] ?? $o['email'] ?? '—'), ENT_QUOTES);
+        $total  = number_format((float)($o['total'] ?? 0));
+        $pay    = htmlspecialchars((string)($o['payment_method'] ?? ''), ENT_QUOTES);
+        $items  = $o['items'] ?? [];
+        if (is_string($items)) { $items = json_decode($items, true) ?: []; }
+
+        $addr = htmlspecialchars(implode(', ', array_filter([
+            $o['address'] ?? '', $o['city'] ?? '', $o['state'] ?? '', $o['pincode'] ?? '',
+        ])), ENT_QUOTES);
+
+        $adminLink = SITE_URL . '/admin/';
+        $subject   = "New order #{$id} - Muscle Mantra";
+
+        $html = '<div style="background:#050505;padding:32px 0;font-family:Arial,Helvetica,sans-serif">'
+            . '<div style="max-width:480px;margin:0 auto;background:#0d0d0d;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden">'
+            . '<div style="height:3px;background:#FF6B00"></div>'
+            . '<div style="padding:26px 30px">'
+            . '<p style="color:#FF6B00;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;margin:0 0 6px">Muscle Mantra · New order</p>'
+            . '<h1 style="color:#fff;font-size:20px;margin:0 0 4px">Order #' . $id . '</h1>'
+            . '<p style="color:#FF6B00;font-size:22px;font-weight:bold;margin:0 0 16px">&#8377;' . $total . ' <span style="color:rgba(245,245,245,0.4);font-size:13px;font-weight:normal">· ' . ($pay ?: 'COD') . '</span></p>'
+            . '<table style="width:100%;font-size:13px;color:rgba(245,245,245,0.7);line-height:1.7">'
+            . '<tr><td style="color:rgba(245,245,245,0.4);width:78px">Customer</td><td style="color:#fff">' . $name . '</td></tr>'
+            . '<tr><td style="color:rgba(245,245,245,0.4)">Phone</td><td style="color:#fff">' . $phone . '</td></tr>'
+            . '<tr><td style="color:rgba(245,245,245,0.4)">Email</td><td>' . $emailC . '</td></tr>'
+            . '<tr><td style="color:rgba(245,245,245,0.4);vertical-align:top">Address</td><td>' . ($addr ?: '—') . '</td></tr>'
+            . '</table>'
+            . mm_order_items_html($items)
+            . '<div style="margin:20px 0 0"><a href="' . htmlspecialchars($adminLink, ENT_QUOTES) . '" style="display:inline-block;background:#FF6B00;color:#fff;font-size:13px;font-weight:bold;text-decoration:none;padding:11px 22px;border-radius:10px">Open admin panel</a></div>'
+            . '</div></div></div>';
+
+        return mm_send_mail($to, $subject, $html);
+    }
 }
 
