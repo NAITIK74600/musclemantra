@@ -206,25 +206,43 @@ export async function signIn(email: string, password: string): Promise<{ ok: boo
 }
 
 /**
- * Demo "Continue with Google". Without a backend we can't run the real OAuth
- * flow, so we simulate a returning Google account (or create one on first use).
+ * Sign in with a real Google profile (from @react-oauth/google userinfo endpoint).
+ * Creates or merges the account in localStorage.
  */
-export function signInWithGoogle(): { ok: boolean; user?: User } {
-  const email = 'rohit.google@gmail.com';
+export function signInWithGoogleProfile(profile: {
+  sub: string;
+  email: string;
+  name: string;
+  picture?: string;
+  email_verified?: boolean;
+}): { ok: boolean; error?: string; user?: User } {
+  if (!profile.email || profile.email_verified === false) {
+    return { ok: false, error: 'Google account email is not verified.' };
+  }
+  const cleanEmail = profile.email.trim().toLowerCase();
   const users = readUsers();
-  let u = users.find(x => x.email === email);
-  if (!u) {
+  let u = users.find(x => x.email === cleanEmail);
+
+  if (u) {
+    // Update Google profile data silently
+    u.name = u.name || profile.name;
+    if (profile.picture) u.avatar = sanitizeImageUrl(profile.picture);
+    const idx = users.findIndex(x => x.email === cleanEmail);
+    users[idx] = u;
+    writeUsers(users);
+  } else {
     u = {
       id: uid(),
-      name: 'Rohit Kumar',
-      email,
+      name: profile.name,
+      email: cleanEmail,
       provider: 'google',
-      avatar: sanitizeImageUrl('https://lh3.googleusercontent.com/a/default-user=s96-c'),
+      avatar: profile.picture ? sanitizeImageUrl(profile.picture) : undefined,
       createdAt: Date.now(),
     };
     users.push(u);
     writeUsers(users);
   }
+
   setSession(u.id);
   return { ok: true, user: publicUser(u) };
 }

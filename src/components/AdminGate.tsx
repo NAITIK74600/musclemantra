@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Eye, EyeOff, ShieldCheck, AlertTriangle, Loader2, UserPlus, KeyRound } from 'lucide-react';
 import {
   hasAdminSetup, isAdminAuthenticated, signInAdmin, setupAdmin,
-  adminLockoutRemaining,
+  adminLockoutRemaining, verifySetupKey,
 } from '@/lib/adminAuth';
 
 interface Props {
@@ -19,6 +19,7 @@ export default function AdminGate({ children, onReady }: Props) {
   const [email, setEmail]     = useState('');
   const [pw, setPw]           = useState('');
   const [pw2, setPw2]         = useState('');  // confirm pw for setup
+  const [setupKey, setSetupKey] = useState(''); // secret setup key
   const [showPw, setShowPw]   = useState(false);
   const [error, setError]     = useState('');
   const [busy, setBusy]       = useState(false);
@@ -62,6 +63,10 @@ export default function AdminGate({ children, onReady }: Props) {
   const handleSetup = useCallback(async () => {
     if (busy) return;
     setError('');
+    if (!verifySetupKey(setupKey)) {
+      setError('Invalid setup key. Contact the store owner.');
+      return;
+    }
     if (pw !== pw2) { setError('Passwords do not match.'); return; }
     setBusy(true);
     const res = await setupAdmin(email, pw);
@@ -73,7 +78,7 @@ export default function AdminGate({ children, onReady }: Props) {
     } else {
       setError(res.error ?? 'Setup failed.');
     }
-  }, [busy, email, pw, pw2]);
+  }, [busy, email, pw, pw2, setupKey]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -155,7 +160,7 @@ export default function AdminGate({ children, onReady }: Props) {
                 <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-[rgba(255,107,0,0.07)] border border-[rgba(255,107,0,0.2)]">
                   <AlertTriangle size={14} className="text-[#FF6B00] shrink-0 mt-0.5" />
                   <p className="text-[12px] text-[rgba(245,245,245,0.7)] leading-relaxed">
-                    No admin account exists. Create one now — credentials are stored securely (PBKDF2-SHA256) in this browser only.
+                    Enter the <strong className="text-[#FF6B00]">Setup Key</strong> (from .env) + your email + a password to create the one-time admin account.
                   </p>
                 </div>
               ) : (
@@ -167,6 +172,24 @@ export default function AdminGate({ children, onReady }: Props) {
 
             {/* Form */}
             <div className="px-8 py-6 space-y-4" onKeyDown={handleKeyDown}>
+              {/* Setup Key (only shown during first-time setup) */}
+              {isSetup && (
+                <div>
+                  <label className="block text-[11px] font-bold tracking-[0.15em] uppercase text-[rgba(245,245,245,0.45)] mb-1.5">
+                    Setup Key
+                  </label>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={setupKey}
+                    onChange={e => { setSetupKey(e.target.value); setError(''); }}
+                    placeholder="Enter secret setup key"
+                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-[rgba(255,107,0,0.25)] rounded-xl text-sm text-white placeholder:text-[rgba(245,245,245,0.2)] focus:border-[#FF6B00] focus:outline-none transition-colors"
+                  />
+                  <p className="mt-1.5 text-[10px] text-[rgba(245,245,245,0.25)]">Required to create the admin account — contact the site owner.</p>
+                </div>
+              )}
+
               {/* Email */}
               <div>
                 <label className="block text-[11px] font-bold tracking-[0.15em] uppercase text-[rgba(245,245,245,0.45)] mb-1.5">
@@ -252,7 +275,7 @@ export default function AdminGate({ children, onReady }: Props) {
               {/* Submit */}
               <button
                 onClick={isSetup ? handleSetup : handleSignIn}
-                disabled={busy || lockSecs > 0 || !email || !pw}
+                disabled={busy || lockSecs > 0 || !email || !pw || (isSetup && !setupKey)}
                 className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#FF6B00] hover:bg-[#E55A00] disabled:bg-[rgba(255,107,0,0.3)] disabled:cursor-not-allowed text-white font-black rounded-xl text-[14px] transition-all shadow-[0_0_20px_rgba(255,107,0,0.2)]"
               >
                 {busy

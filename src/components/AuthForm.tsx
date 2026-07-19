@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User as UserIcon, Eye, EyeOff, ArrowRight, ShieldCheck, Loader2 } from 'lucide-react';
-import { signIn, signUp, signInWithGoogle } from '@/lib/auth';
+import { signIn, signUp, signInWithGoogleProfile } from '@/lib/auth';
+import { useGoogleLogin } from '@react-oauth/google';
 import { scorePassword } from '@/lib/security';
 
 function GoogleIcon({ size = 18 }: { size?: number }) {
@@ -33,6 +34,31 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   // Live password strength (only used on the signup form)
   const strength = useMemo(() => scorePassword(password), [password]);
 
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        if (!res.ok) throw new Error('Failed to fetch Google profile');
+        const profile = await res.json() as {
+          sub: string; email: string; name: string;
+          picture?: string; email_verified?: boolean;
+        };
+        const result = signInWithGoogleProfile(profile);
+        if (!result.ok) { setError(result.error || 'Google sign-in failed.'); return; }
+        router.push('/account');
+      } catch {
+        setError('Google sign-in failed. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => setError('Google sign-in failed. Please try again.'),
+  });
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -54,8 +80,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
 
   const google = () => {
     setError('');
-    signInWithGoogle();
-    router.push('/account');
+    googleLogin();
   };
 
   return (

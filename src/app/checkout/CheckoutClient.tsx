@@ -121,31 +121,120 @@ export default function CheckoutClient() {
     return Object.keys(e).length === 0;
   };
 
-  const placeOrder = () => {
+  const placeOrder = async () => {
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => {
-      const id = 'MM' + Date.now().toString().slice(-8);
+
+    const txnid = 'MM' + Date.now().toString().slice(-8);
+    const amountStr = finalTotal.toFixed(2);
+    const productinfo = items.map(i => i.name).join(', ').slice(0, 100);
+
+    // ── COD flow (no PayU) ──────────────────────────────────────────────────
+    if (paymentMethod === 'cod') {
+      const orderData = {
+        id: txnid, items, shippingAddress: form, paymentMethod,
+        total: finalTotal, shipping, discount,
+        status: 'Confirmed — Pay on Delivery',
+        createdAt: new Date().toISOString(),
+      };
+      // Save to server (PHP API) — primary store
+      fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData),
+      }).catch(() => {});
+      // Also cache order ID locally so user can view it on /orders
       try {
-        const existing = JSON.parse(localStorage.getItem('mb_orders') || '[]');
-        existing.push({
-          id,
-          items,
-          shippingAddress: form,
-          paymentMethod,
-          total: finalTotal,
-          status: paymentMethod === 'cod' ? 'Confirmed — Pay on Delivery' : 'Confirmed',
-          createdAt: new Date().toISOString(),
-        });
-        localStorage.setItem('mb_orders', JSON.stringify(existing));
-      } catch {
-        // localStorage may be unavailable
-      }
+        const ids: string[] = JSON.parse(localStorage.getItem('mb_order_ids') || '[]');
+        ids.push(txnid);
+        localStorage.setItem('mb_order_ids', JSON.stringify(ids));
+      } catch { /* ignore */ }
       clearCart();
-      setOrderId(id);
+      setOrderId(txnid);
       setLoading(false);
       setStep('success');
-    }, 1600);
+      return;
+    }
+
+    // ── Online payment via PayU ─────────────────────────────────────────────
+    try {
+      const res = await fetch('/api/payu-hash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          txnid,
+          amount: amountStr,
+          productinfo,
+          firstname: form.name.trim(),
+          email: form.email.trim() || 'customer@musclemantra.in',
+          udf1: form.phone.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.hash) {
+        setLoading(false);
+        setErrors(e => ({ ...e, name: data.error ?? 'Payment gateway error. Please try COD.' }));
+        return;
+      }
+
+      // Save order info so success page can display it
+      sessionStorage.setItem('mm_payu_order', JSON.stringify({ txnid, amount: amountStr }));
+
+      // Save pending order to server
+      const pendingOrder = {
+        id: txnid, items, shippingAddress: form, paymentMethod,
+        total: finalTotal, shipping, discount,
+        status: 'Payment Pending',
+        createdAt: new Date().toISOString(),
+      };
+      fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pendingOrder),
+      }).catch(() => {});
+      // Cache order ID locally
+      try {
+        const ids: string[] = JSON.parse(localStorage.getItem('mb_order_ids') || '[]');
+        ids.push(txnid);
+        localStorage.setItem('mb_order_ids', JSON.stringify(ids));
+      } catch { /* ignore */ }
+
+      clearCart();
+
+      // Build the PayU form and submit it programmatically
+      const siteUrl = window.location.origin;
+      const params: Record<string, string> = {
+        key:         data.key,
+        txnid,
+        amount:      amountStr,
+        productinfo,
+        firstname:   form.name.trim(),
+        email:       form.email.trim() || 'customer@musclemantra.in',
+        phone:       form.phone.trim(),
+        surl:        `${siteUrl}/api/payu-return`,
+        furl:        `${siteUrl}/api/payu-return`,
+        hash:        data.hash,
+        udf1:        form.phone.trim(),
+        service_provider: 'payu_paisa',
+      };
+
+      const form$ = document.createElement('form');
+      form$.method = 'POST';
+      form$.action = data.payuUrl;
+      Object.entries(params).forEach(([k, v]) => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = k; inp.value = v;
+        form$.appendChild(inp);
+      });
+      document.body.appendChild(form$);
+      form$.submit();
+
+    } catch {
+      setLoading(false);
+      setErrors(e => ({ ...e, name: 'Network error. Please try again or use COD.' }));
+    }
   };
 
   /* ---- Empty cart ---- */
@@ -184,11 +273,11 @@ export default function CheckoutClient() {
           </p>
         )}
         <div className="flex gap-3 flex-wrap justify-center mt-4">
-          <Link href="/orders" className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold rounded-xl transition-all text-sm">
-            <Package size={16} /> Track Order
+          <Link href={`/invoice/${orderId}`} className="inline-flex items-center gap-2 px-6 py-3 bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold rounded-xl transition-all text-sm">
+            <Package size={16} /> View Invoice
           </Link>
-          <Link href="/products" className="inline-flex items-center gap-2 px-6 py-3 border border-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.3)] text-white font-bold rounded-xl transition-all text-sm">
-            <ShoppingBag size={16} /> Continue Shopping
+          <Link href="/orders" className="inline-flex items-center gap-2 px-6 py-3 border border-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.3)] text-white font-bold rounded-xl transition-all text-sm">
+            <ShoppingBag size={16} /> My Orders
           </Link>
         </div>
       </motion.div>
@@ -332,7 +421,7 @@ export default function CheckoutClient() {
                     className="overflow-hidden"
                   >
                     <div className="p-3.5 rounded-xl bg-[rgba(255,107,0,0.06)] border border-[rgba(255,107,0,0.15)] text-[12px] text-[rgba(245,245,245,0.6)]">
-                      Online payment gateway will be available soon. For now, please select <span className="font-bold text-[#FF6B00]">Cash on Delivery</span>.
+                      <span className="font-bold text-[#FF6B00]">Secured by PayU</span> — you will be redirected to PayU's secure payment page to complete your payment. All major UPI apps, cards &amp; net banking supported.
                     </div>
                   </motion.div>
                 )}
@@ -408,9 +497,11 @@ export default function CheckoutClient() {
                     Placing Order...
                   </>
                 ) : (
-                  <>
+                  <>  
                     {paymentMethod === 'cod' ? <Banknote size={18} /> : <Lock size={18} />}
-                    {paymentMethod === 'cod' ? 'Place Order (Pay on Delivery)' : 'Place Order'}
+                    {paymentMethod === 'cod'
+                      ? 'Place Order (Pay on Delivery)'
+                      : `Pay ₹${finalTotal.toLocaleString()} via PayU`}
                   </>
                 )}
               </button>
@@ -422,6 +513,7 @@ export default function CheckoutClient() {
                 <span>100% Authentic</span>
                 <span>•</span>
                 <span>Easy Returns</span>
+                {paymentMethod !== 'cod' && <><span>•</span><span className="text-[rgba(255,107,0,0.5)]">Powered by PayU</span></>}
               </div>
 
               {/* Policies */}

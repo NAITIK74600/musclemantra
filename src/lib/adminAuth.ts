@@ -8,11 +8,21 @@
  *  • Session token stored in sessionStorage — auto-clears on browser close.
  *  • Session TTL: 8 hours.
  *  • Rate-limit: 3 failed attempts → 15-minute lockout.
- *  • No admin email/password is shipped in source code; first visit triggers
- *    a one-time "Create Admin Account" setup screen.
+ *  • Setup is protected by NEXT_PUBLIC_ADMIN_SETUP_KEY env var —
+ *    anyone who doesn't know the key cannot create the admin account.
  */
 
 import { hashPassword, verifyPassword } from './security';
+
+// The setup key is baked in at build time from the env var.
+// Set NEXT_PUBLIC_ADMIN_SETUP_KEY in your .env.local / Netlify env.
+const SETUP_KEY: string = process.env.NEXT_PUBLIC_ADMIN_SETUP_KEY ?? '';
+
+/** Validates the setup key entered by the user. */
+export function verifySetupKey(input: string): boolean {
+  if (!SETUP_KEY) return false; // no key configured → block all setup
+  return input.trim() === SETUP_KEY.trim();
+}
 
 const ADMIN_CREDS_KEY = 'mb_admin_creds_v1';
 const ADMIN_SESSION_KEY = 'mb_admin_sess_v1';

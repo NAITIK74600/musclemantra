@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -33,7 +33,7 @@ import { signOutAdmin, getAdminEmail, changeAdminPassword } from '@/lib/adminAut
 const sidebarItems = [
   { id: 'dashboard',     icon: LayoutDashboard,  label: 'Dashboard' },
   { id: 'appointments',  icon: Calendar,          label: 'Appointments' },
-  { id: 'orders',        icon: ShoppingCart,      label: 'Orders',          badge: '12' },
+  { id: 'orders',        icon: ShoppingCart,      label: 'Orders',          badge: 'live' },
   { id: 'products',      icon: Box,               label: 'Products' },
   { id: 'categories',    icon: LayoutGrid,        label: 'Categories' },
   { id: 'promotions',    icon: Megaphone,         label: 'Promotions' },
@@ -51,21 +51,6 @@ const sidebarItems = [
 
 // Stats are derived at runtime from the store inside AdminDashboard.
 // (Removed the hardcoded fake const here.)
-
-const recentOrders = [
-  { id: '#MM12345', customer: 'Rohit Sharma', product: 'ON Whey Protein 2kg', amount: '₹2,999', status: 'delivered', date: '15 May' },
-  { id: '#MM12344', customer: 'Priya Mehta', product: 'MM Creatine 300g', amount: '₹1,299', status: 'shipped', date: '15 May' },
-  { id: '#MM12343', customer: 'Arjun Singh', product: 'C4 Pre-Workout', amount: '₹2,199', status: 'processing', date: '14 May' },
-  { id: '#MM12342', customer: 'Kavya R.', product: 'Mass Gainer 6kg', amount: '₹4,299', status: 'delivered', date: '14 May' },
-  { id: '#MM12341', customer: 'Amit Kumar', product: 'BCAA Pro 450g', amount: '₹1,299', status: 'cancelled', date: '13 May' },
-];
-
-const topProducts = [
-  { name: 'ON Whey Protein 2kg', sku: 'ON-WHEY-2KG', sales: 842, revenue: '₹25,23,558' },
-  { name: 'MM Creatine 300g', sku: 'MM-CRT-300', sales: 623, revenue: '₹8,10,277' },
-  { name: 'MM Mass Gainer 2kg', sku: 'MM-MASS-2KG', sales: 512, revenue: '₹22,00,688' },
-  { name: 'MM Pre Workout 300g', sku: 'MM-PRE-300', sales: 421, revenue: '₹7,48,879' },
-];
 
 const statusColors: Record<string, string> = {
   delivered: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
@@ -207,6 +192,66 @@ function AdminDashboard() {
     cod: true, onlinePay: true, sameDay: true, lowStockAlerts: true, reviews: false, maintenance: false,
   });
   const flip = (k: keyof typeof toggles) => setToggles(t => ({ ...t, [k]: !t[k] }));
+
+  // ── Orders (fetched from server) ─────────────────────────────────────────
+  const ADMIN_KEY_VAL = process.env.NEXT_PUBLIC_ADMIN_SETUP_KEY ?? '';
+
+  interface AdminOrder {
+    id: string;
+    items: { name: string; price: number; quantity: number }[];
+    shippingAddress: { name: string; phone: string; email?: string; address: string; area: string; city: string; pincode: string };
+    paymentMethod: string;
+    total: number;
+    status: string;
+    createdAt: string;
+  }
+
+  const [orderList, setOrderList] = useState<AdminOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [orderFilter, setOrderFilter] = useState('All');
+  const [orderSearch, setOrderSearch] = useState('');
+
+  const fetchOrders = useCallback(async () => {
+    setOrdersLoading(true);
+    try {
+      const res = await fetch('/api/get-orders', {
+        headers: { 'x-admin-key': ADMIN_KEY_VAL },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOrderList(Array.isArray(data) ? data : []);
+      }
+    } catch { /* silent */ }
+    setOrdersLoading(false);
+  }, [ADMIN_KEY_VAL]);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  const updateOrderStatus = useCallback(async (id: string, status: string) => {
+    await fetch('/api/update-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
+      body: JSON.stringify({ id, status }),
+    });
+    setOrderList(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    toast.push({ variant: 'success', title: `Order updated: ${status}` });
+  }, [ADMIN_KEY_VAL, toast]);
+
+  const filteredOrders = useMemo(() => {
+    let list = orderList;
+    if (orderFilter !== 'All') {
+      list = list.filter(o => o.status.toLowerCase().includes(orderFilter.toLowerCase()));
+    }
+    if (orderSearch.trim()) {
+      const q = orderSearch.trim().toLowerCase();
+      list = list.filter(o =>
+        o.id.toLowerCase().includes(q) ||
+        o.shippingAddress.name.toLowerCase().includes(q) ||
+        o.shippingAddress.phone?.includes(q)
+      );
+    }
+    return list;
+  }, [orderList, orderFilter, orderSearch]);
 
   // ── Brands & Promotions (persisted via shared store) ──
   const [brandList, setBrandList] = useState<Brand[]>([]);
@@ -535,7 +580,9 @@ function AdminDashboard() {
                 <>
                   <span className="font-medium">{item.label}</span>
                   {item.badge && (
-                    <span className="ml-auto bg-[#FF6B00] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{item.badge}</span>
+                    <span className="ml-auto bg-[#FF6B00] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                      {item.id === 'orders' ? (orderList.length || '0') : item.badge}
+                    </span>
                   )}
                 </>
               )}
@@ -650,16 +697,19 @@ function AdminDashboard() {
                     <Link href="/admin/products" className="text-xs text-[#FF6B00] font-bold">View All</Link>
                   </div>
                   <div className="space-y-3">
-                    {topProducts.map((p, i) => (
-                      <div key={p.name} className="flex items-center gap-3">
+                    {productList.slice(0, 4).map((p, i) => (
+                      <div key={p.id} className="flex items-center gap-3">
                         <div className="w-6 h-6 rounded-lg bg-[rgba(255,107,0,0.1)] flex items-center justify-center text-[10px] font-black text-[#FF6B00]">{i + 1}</div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[12px] font-semibold text-white line-clamp-1">{p.name}</p>
-                          <p className="text-[10px] text-[rgba(245,245,245,0.4)]">{p.sales} sold</p>
+                          <p className="text-[10px] text-[rgba(245,245,245,0.4)]">₹{p.price.toLocaleString('en-IN')} · Stock: {p.stock}</p>
                         </div>
-                        <span className="text-[11px] font-bold text-white shrink-0">{p.revenue}</span>
+                        <span className="text-[11px] font-bold text-white shrink-0">₹{(p.price * p.stock).toLocaleString('en-IN')}</span>
                       </div>
                     ))}
+                    {productList.length === 0 && (
+                      <p className="text-xs text-[rgba(245,245,245,0.3)] text-center py-4">No products yet. Add products to see them here.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -680,24 +730,27 @@ function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {recentOrders.map(o => (
-                        <tr key={o.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-white/[0.02] transition-colors">
-                          <td className="px-5 py-3 text-[#FF6B00] text-[12px] font-bold">{o.id}</td>
-                          <td className="px-5 py-3 text-white text-[12px]">{o.customer}</td>
-                          <td className="px-5 py-3 text-[rgba(245,245,245,0.6)] text-[12px] max-w-[160px]"><span className="line-clamp-1">{o.product}</span></td>
-                          <td className="px-5 py-3 text-white text-[12px] font-bold">{o.amount}</td>
-                          <td className="px-5 py-3">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${statusColors[o.status]}`}>{o.status}</span>
-                          </td>
-                          <td className="px-5 py-3 text-[rgba(245,245,245,0.4)] text-[12px]">{o.date}</td>
-                          <td className="px-5 py-3">
-                            <div className="flex gap-2">
-                              <button className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-white hover:bg-white/5 rounded-lg transition-all"><Eye size={13} /></button>
-                              <button className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all"><Edit2 size={13} /></button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {orderList.length === 0 && (
+                        <tr><td colSpan={7} className="px-5 py-8 text-center text-xs text-[rgba(245,245,245,0.3)]">
+                          {ordersLoading ? 'Loading orders…' : 'No orders yet'}
+                        </td></tr>
+                      )}
+                      {orderList.slice(0, 5).map(o => {
+                        const preview = o.items.slice(0, 1).map(i => i.name).join(', ') + (o.items.length > 1 ? ` +${o.items.length - 1}` : '');
+                        const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+                        const sKey = o.status.toLowerCase().includes('deliver') ? 'delivered' : o.status.toLowerCase().includes('ship') ? 'shipped' : o.status.toLowerCase().includes('cancel') ? 'cancelled' : 'processing';
+                        return (
+                          <tr key={o.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-white/[0.02] transition-colors">
+                            <td className="px-5 py-3 text-[#FF6B00] text-[12px] font-bold">#{o.id}</td>
+                            <td className="px-5 py-3 text-white text-[12px]">{o.shippingAddress.name}</td>
+                            <td className="px-5 py-3 text-[rgba(245,245,245,0.6)] text-[12px] max-w-[160px]"><span className="line-clamp-1">{preview}</span></td>
+                            <td className="px-5 py-3 text-white text-[12px] font-bold">₹{o.total.toLocaleString('en-IN')}</td>
+                            <td className="px-5 py-3"><span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${statusColors[sKey] ?? statusColors.processing}`}>{o.status}</span></td>
+                            <td className="px-5 py-3 text-[rgba(245,245,245,0.4)] text-[12px]">{date}</td>
+                            <td className="px-5 py-3"><button onClick={() => setActiveSection('orders')} className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-white hover:bg-white/5 rounded-lg transition-all"><Eye size={13} /></button></td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1133,30 +1186,69 @@ function AdminDashboard() {
                   ))}
                 </div>
               </div>
-              <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden">
+              {/* Search + Refresh */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1 max-w-xs">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[rgba(245,245,245,0.35)]" />
+                  <input value={orderSearch} onChange={e => setOrderSearch(e.target.value)} placeholder="Search order / customer"
+                    className="w-full pl-8 pr-3 py-2 bg-[#111] border border-[rgba(255,255,255,0.08)] rounded-xl text-sm text-white placeholder:text-[rgba(245,245,245,0.3)] focus:border-[rgba(255,107,0,0.4)] focus:outline-none" />
+                </div>
+                <button onClick={fetchOrders} disabled={ordersLoading}
+                  className="px-4 py-2 text-xs font-bold bg-[rgba(255,107,0,0.1)] text-[#FF6B00] border border-[rgba(255,107,0,0.2)] rounded-xl hover:bg-[rgba(255,107,0,0.18)] transition-all disabled:opacity-50">
+                  {ordersLoading ? 'Loading…' : 'Refresh'}
+                </button>
+                <span className="text-xs text-[rgba(245,245,245,0.35)]">{filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}</span>
+              </div>
+
+              <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)]">
-                      {['Order ID', 'Customer', 'Product', 'Amount', 'Status', 'Date', 'Action'].map(h => (
-                        <th key={h} className="text-left px-5 py-3 text-[10px] font-bold tracking-widest text-[rgba(245,245,245,0.35)] uppercase">{h}</th>
+                      {['Order ID', 'Customer', 'Items', 'Amount', 'Payment', 'Status', 'Date', 'Action'].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-[10px] font-bold tracking-widest text-[rgba(245,245,245,0.35)] uppercase whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {recentOrders.map(o => (
-                      <tr key={o.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-white/[0.02] transition-colors">
-                        <td className="px-5 py-3 text-[#FF6B00] text-[12px] font-bold">{o.id}</td>
-                        <td className="px-5 py-3 text-white text-[12px]">{o.customer}</td>
-                        <td className="px-5 py-3 text-[rgba(245,245,245,0.6)] text-[12px]">{o.product}</td>
-                        <td className="px-5 py-3 text-white text-[12px] font-bold">{o.amount}</td>
-                        <td className="px-5 py-3"><span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${statusColors[o.status]}`}>{o.status}</span></td>
-                        <td className="px-5 py-3 text-[rgba(245,245,245,0.4)] text-[12px]">{o.date}</td>
-                        <td className="px-5 py-3 flex gap-2">
-                          <button className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-white hover:bg-white/5 rounded-lg transition-all"><Eye size={13} /></button>
-                          <button className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all"><Edit2 size={13} /></button>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredOrders.length === 0 && (
+                      <tr><td colSpan={8} className="px-5 py-12 text-center text-sm text-[rgba(245,245,245,0.3)]">
+                        {ordersLoading ? 'Loading orders…' : 'No orders found'}
+                      </td></tr>
+                    )}
+                    {filteredOrders.map(o => {
+                      const preview = o.items.map(i => `${i.name} ×${i.quantity}`).join(', ');
+                      const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
+                      const sKey = o.status.toLowerCase().includes('deliver') ? 'delivered' : o.status.toLowerCase().includes('ship') ? 'shipped' : o.status.toLowerCase().includes('cancel') ? 'cancelled' : 'processing';
+                      const pmLabel: Record<string, string> = { cod: 'COD', upi: 'UPI', card: 'Card', netbanking: 'NetBanking' };
+                      return (
+                        <tr key={o.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-white/[0.02] transition-colors">
+                          <td className="px-4 py-3 text-[#FF6B00] text-[12px] font-bold whitespace-nowrap">#{o.id}</td>
+                          <td className="px-4 py-3">
+                            <div className="text-white text-[12px] font-semibold">{o.shippingAddress.name}</div>
+                            <div className="text-[11px] text-[rgba(245,245,245,0.4)]">{o.shippingAddress.phone}</div>
+                          </td>
+                          <td className="px-4 py-3 text-[rgba(245,245,245,0.6)] text-[11px] max-w-[180px]"><span className="line-clamp-2">{preview}</span></td>
+                          <td className="px-4 py-3 text-white text-[12px] font-bold whitespace-nowrap">₹{o.total.toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-3 text-[rgba(245,245,245,0.5)] text-[11px] whitespace-nowrap">{pmLabel[o.paymentMethod] ?? o.paymentMethod}</td>
+                          <td className="px-4 py-3">
+                            <select value={o.status}
+                              onChange={e => updateOrderStatus(o.id, e.target.value)}
+                              className="bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-lg px-2 py-1 text-[11px] text-white focus:border-[#FF6B00] focus:outline-none">
+                              {['Confirmed — Pay on Delivery','Payment Pending','Payment Received','Processing','Packed','Shipped','Out for Delivery','Delivered','Cancelled','Returned'].map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-4 py-3 text-[rgba(245,245,245,0.4)] text-[11px] whitespace-nowrap">{date}</td>
+                          <td className="px-4 py-3">
+                            <a href={`/invoice/${o.id}`} target="_blank" rel="noreferrer"
+                              className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all inline-flex">
+                              <Eye size={13} />
+                            </a>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
