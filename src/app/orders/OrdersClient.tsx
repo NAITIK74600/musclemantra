@@ -58,6 +58,38 @@ const PM_LABELS: Record<string, string> = {
   card: 'Credit / Debit Card', netbanking: 'Net Banking',
 };
 
+/** Map a server row (flat snake_case) or legacy object into the Order shape. */
+function normalizeOrder(o: Record<string, unknown>): Order {
+  const g = (k: string) => (o[k] ?? '') as string;
+  // Legacy localStorage orders are already nested.
+  if (o.shippingAddress) {
+    return {
+      ...(o as unknown as Order),
+      items: Array.isArray(o.items) ? (o.items as OrderItem[]) : [],
+    };
+  }
+  let items: OrderItem[] = [];
+  if (Array.isArray(o.items)) items = o.items as OrderItem[];
+  else if (typeof o.items === 'string') { try { items = JSON.parse(o.items) || []; } catch { items = []; } }
+  return {
+    id: String(o.id ?? ''),
+    items,
+    shippingAddress: {
+      name: (o.customer_name ?? o.name ?? '') as string,
+      phone: (o.customer_phone ?? o.phone ?? '') as string,
+      address: g('address'),
+      area: g('area'),
+      city: g('city'),
+      state: g('state'),
+      pincode: g('pincode'),
+    },
+    paymentMethod: (o.payment_method ?? o.paymentMethod ?? '') as string,
+    total: Number(o.total ?? 0),
+    status: (o.status ?? '') as string,
+    createdAt: (o.created_at ?? o.createdAt ?? '') as string,
+  };
+}
+
 export default function OrdersClient() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -77,15 +109,15 @@ export default function OrdersClient() {
         // Fetch from server
         const res = await fetch(`/api/get-orders?ids=${allIds.join(',')}`);
         if (res.ok) {
-          const data: Order[] = await res.json();
-          setOrders(data);
+          const data: Record<string, unknown>[] = await res.json();
+          setOrders(Array.isArray(data) ? data.map(normalizeOrder) : []);
         } else {
           // Fallback to legacy localStorage orders if API fails
-          setOrders(legacy.slice().reverse());
+          setOrders(legacy.slice().reverse().map(o => normalizeOrder(o as unknown as Record<string, unknown>)));
         }
       } catch {
         const legacy: Order[] = JSON.parse(localStorage.getItem('mb_orders') || '[]');
-        setOrders(legacy.slice().reverse());
+        setOrders(legacy.slice().reverse().map(o => normalizeOrder(o as unknown as Record<string, unknown>)));
       }
       setLoaded(true);
     };
@@ -134,11 +166,13 @@ export default function OrdersClient() {
       <div className="container-max py-8 space-y-4">
         <AnimatePresence>
           {orders.map((order, idx) => {
-            const date = new Date(order.createdAt).toLocaleDateString('en-IN', {
-              day: '2-digit', month: 'short', year: 'numeric',
-            });
-            const preview = order.items.slice(0, 2).map(i => i.name).join(', ')
-              + (order.items.length > 2 ? ` +${order.items.length - 2} more` : '');
+            const dateObj = order.createdAt ? new Date(order.createdAt) : null;
+            const date = dateObj && !isNaN(dateObj.getTime())
+              ? dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+              : '';
+            const items = order.items ?? [];
+            const preview = items.slice(0, 2).map(i => i.name).join(', ')
+              + (items.length > 2 ? ` +${items.length - 2} more` : '');
 
             return (
               <motion.div
@@ -168,8 +202,11 @@ export default function OrdersClient() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[rgba(245,245,245,0.65)] truncate">{preview}</p>
                     <p className="text-xs text-[rgba(245,245,245,0.35)] mt-1">
-                      {order.items.reduce((s, i) => s + i.quantity, 0)} item{order.items.reduce((s, i) => s + i.quantity, 0) !== 1 ? 's' : ''}
-                      {' '}•{' '}{order.shippingAddress.area}, {order.shippingAddress.city}
+                      {items.reduce((s, i) => s + i.quantity, 0)} item{items.reduce((s, i) => s + i.quantity, 0) !== 1 ? 's' : ''}
+                      {(() => {
+                        const loc = [order.shippingAddress?.area, order.shippingAddress?.city].filter(Boolean).join(', ');
+                        return loc ? <> {' '}•{' '}{loc}</> : null;
+                      })()}
                     </p>
                   </div>
                   <div className="text-right">
@@ -186,6 +223,14 @@ export default function OrdersClient() {
                   >
                     <FileText size={13} /> View Invoice
                   </Link>
+                  {!['delivered', 'cancelled', 'returned', 'failed'].some(s => order.status.toLowerCase().includes(s)) && (
+                    <Link
+                      href={`/track?id=${encodeURIComponent(order.id)}${order.shippingAddress?.phone ? `&phone=${encodeURIComponent(order.shippingAddress.phone)}` : ''}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 bg-[rgba(255,107,0,0.1)] hover:bg-[rgba(255,107,0,0.18)] text-[#FF6B00] border border-[rgba(255,107,0,0.2)] rounded-xl transition-all"
+                    >
+                      <Truck size={13} /> Track Order
+                    </Link>
+                  )}
                   <Link
                     href="/products"
                     className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] text-[rgba(245,245,245,0.6)] border border-[rgba(255,255,255,0.08)] rounded-xl transition-all"

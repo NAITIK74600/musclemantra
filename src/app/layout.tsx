@@ -49,11 +49,13 @@ export const metadata: Metadata = {
   // Favicon / browser-tab & app icons (Muscle Mantra gold logo)
   icons: {
     icon: [
-      { url: "/logo.png", type: "image/png", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16.png", type: "image/png", sizes: "16x16" },
       { url: "/favicon.ico", sizes: "any" },
     ],
-    shortcut: ["/logo.png"],
-    apple: [{ url: "/logo.png", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/favicon-32.png"],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 
   // Google Search Console verification

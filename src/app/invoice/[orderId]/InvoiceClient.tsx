@@ -48,6 +48,39 @@ const PM_LABELS: Record<string, string> = {
   netbanking: 'Net Banking',
 };
 
+/** Map a server row (flat snake_case) or legacy object into the Order shape. */
+function normalizeOrder(o: Record<string, unknown>): Order {
+  if (o.shippingAddress) {
+    return {
+      ...(o as unknown as Order),
+      items: Array.isArray(o.items) ? (o.items as OrderItem[]) : [],
+    };
+  }
+  let items: OrderItem[] = [];
+  if (Array.isArray(o.items)) items = o.items as OrderItem[];
+  else if (typeof o.items === 'string') { try { items = JSON.parse(o.items) || []; } catch { items = []; } }
+  return {
+    id: String(o.id ?? ''),
+    items,
+    shippingAddress: {
+      name: (o.customer_name ?? o.name ?? '') as string,
+      phone: (o.customer_phone ?? o.phone ?? '') as string,
+      email: (o.customer_email ?? o.email ?? '') as string,
+      address: (o.address ?? '') as string,
+      area: (o.area ?? '') as string,
+      city: (o.city ?? '') as string,
+      state: (o.state ?? '') as string,
+      pincode: (o.pincode ?? '') as string,
+    },
+    paymentMethod: (o.payment_method ?? o.paymentMethod ?? '') as string,
+    total: Number(o.total ?? 0),
+    shipping: o.shipping != null ? Number(o.shipping) : 0,
+    discount: o.discount != null ? Number(o.discount) : 0,
+    status: (o.status ?? '') as string,
+    createdAt: (o.created_at ?? o.createdAt ?? '') as string,
+  };
+}
+
 export default function InvoiceClient() {
   const params = useParams();
   const orderId = params?.orderId as string;
@@ -62,15 +95,15 @@ export default function InvoiceClient() {
       try {
         const orders: Order[] = JSON.parse(localStorage.getItem('mb_orders') || '[]');
         const found = orders.find(o => o.id === orderId);
-        if (found) { setOrder(found); return; }
+        if (found) { setOrder(normalizeOrder(found as unknown as Record<string, unknown>)); return; }
       } catch { /* ignore */ }
 
       // 2. Fetch from server API
       try {
         const res = await fetch(`/api/get-orders?ids=${encodeURIComponent(orderId)}`);
         if (res.ok) {
-          const data: Order[] = await res.json();
-          if (data.length > 0) { setOrder(data[0]); return; }
+          const data: Record<string, unknown>[] = await res.json();
+          if (Array.isArray(data) && data.length > 0) { setOrder(normalizeOrder(data[0])); return; }
         }
       } catch { /* ignore */ }
 
@@ -102,9 +135,10 @@ export default function InvoiceClient() {
   }
 
   const subtotal = order.total - (order.shipping ?? 0) + (order.discount ?? 0);
-  const date = new Date(order.createdAt).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'long', year: 'numeric',
-  });
+  const dateObj = order.createdAt ? new Date(order.createdAt) : null;
+  const date = dateObj && !isNaN(dateObj.getTime())
+    ? dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
+    : '—';
 
   return (
     <>
