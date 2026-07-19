@@ -163,7 +163,7 @@ function LocationPicker() {
   }, []);
 
   return (
-    <div ref={ref} className="hidden md:block relative shrink-0">
+    <div ref={ref} className="hidden xl:block relative shrink-0">
       <button onClick={() => setOpen(o => !o)}
         className="flex flex-col items-start group min-w-[148px]">
         <span className="text-[10px] text-[rgba(245,245,245,0.4)] leading-none mb-0.5">Delivering to · Patna</span>
@@ -289,7 +289,7 @@ export default function Navbar() {
             <LocationPicker />
 
             {/* Search */}
-            <div ref={searchWrapRef} className="flex-1 relative max-w-2xl">
+            <div ref={searchWrapRef} className="flex-1 relative min-w-0 max-w-md xl:max-w-2xl">
               <form onSubmit={(e) => { e.preventDefault(); submitSearch(); }} role="search">
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[rgba(245,245,245,0.35)] pointer-events-none" />
                 <input
@@ -390,15 +390,15 @@ export default function Navbar() {
             </div>
 
             {/* Right icons */}
-            <div className="hidden lg:flex items-center gap-1">
+            <div className="hidden lg:flex items-center gap-0.5 shrink-0">
               {[
-                { icon: Package, label: 'Track Order', href: '/orders' },
-                { icon: Heart, label: 'Wishlist', href: '/wishlist' },
-                { icon: Repeat, label: 'Reorder', href: '/account' },
-                { icon: BarChart2, label: 'Reports', href: '/account' },
-              ].map(({ icon: Icon, label, href }) => (
+                { icon: Package, label: 'Track Order', href: '/orders', xlOnly: false },
+                { icon: Heart, label: 'Wishlist', href: '/wishlist', xlOnly: false },
+                { icon: Repeat, label: 'Reorder', href: '/account', xlOnly: true },
+                { icon: BarChart2, label: 'Reports', href: '/account', xlOnly: true },
+              ].map(({ icon: Icon, label, href, xlOnly }) => (
                 <Link key={label} href={href}
-                  className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[rgba(245,245,245,0.55)] hover:text-white transition-colors group">
+                  className={`${xlOnly ? 'hidden xl:flex' : 'flex'} flex-col items-center gap-0.5 px-2.5 py-1.5 text-[rgba(245,245,245,0.55)] hover:text-white transition-colors group`}>
                   <Icon size={18} className="group-hover:text-[#FF6B00] transition-colors" />
                   <span className="text-[9px] whitespace-nowrap">{label}</span>
                 </Link>
