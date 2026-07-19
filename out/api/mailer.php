@@ -153,6 +153,7 @@ if (!function_exists('mm_send_mail')) {
             . '<span style="color:#fff;font-size:32px;font-weight:bold;letter-spacing:10px">' . $safe . '</span>'
             . '</div>'
             . '<p style="color:rgba(245,245,245,0.4);font-size:12px;line-height:1.5;margin:0">This code expires in 10 minutes. If you didn\'t request it, you can safely ignore this email.</p>'
+            . '<p style="color:rgba(245,245,245,0.3);font-size:12px;line-height:1.5;margin:8px 0 0">📩 Not seeing this email? Check your <strong style="color:rgba(245,245,245,0.5)">Spam</strong> or <strong style="color:rgba(245,245,245,0.5)">Promotions</strong> folder.</p>'
             . '</div></div></div>';
     }
 
@@ -278,6 +279,7 @@ if (!function_exists('mm_send_mail')) {
                 : '')
             . '</div>'
             . '<p style="color:rgba(245,245,245,0.3);font-size:12px;line-height:1.5;margin:22px 0 0">Need help? Just reply to this email and our team will assist you.</p>'
+            . '<p style="color:rgba(245,245,245,0.3);font-size:12px;line-height:1.5;margin:6px 0 0">📩 Not seeing our emails? Please check your <strong style="color:rgba(245,245,245,0.5)">Spam</strong> or <strong style="color:rgba(245,245,245,0.5)">Promotions</strong> folder and mark us as “Not spam”.</p>'
             . '</div></div></div>';
 
         return mm_send_mail($email, $subject, $html, [

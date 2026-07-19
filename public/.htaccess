@@ -35,6 +35,11 @@ RewriteRule ^(.+)$ $1.php [L]
 RewriteCond %{REQUEST_FILENAME}/index.html -f
 RewriteRule ^(.+?)/?$ /$1/index.html [L]
 
+# ── Dynamic invoice pages ────────────────────────────────────────────────────
+# Static export only builds the /invoice/_ placeholder. Serve it for ANY order
+# id (e.g. /invoice/MB123) — the client reads the real id from the URL & fetches.
+RewriteRule ^invoice/[^/]+/?$ /invoice/_/index.html [L]
+
 # ── Unknown routes → the exported 404 page (never the homepage) ──────────────
 ErrorDocument 404 /404.html
 RewriteRule ^ /404.html [L]

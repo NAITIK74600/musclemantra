@@ -83,12 +83,18 @@ function normalizeOrder(o: Record<string, unknown>): Order {
 
 export default function InvoiceClient() {
   const params = useParams();
-  const orderId = params?.orderId as string;
   const [order, setOrder] = useState<Order | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
+    // Resolve the real order id. Static export serves the "_" placeholder page
+    // for every /invoice/<id>, so fall back to reading the id from the URL.
+    let orderId = (params?.orderId as string) || '';
+    if ((!orderId || orderId === '_') && typeof window !== 'undefined') {
+      const m = window.location.pathname.match(/\/invoice\/([^/]+)/);
+      if (m) orderId = decodeURIComponent(m[1]);
+    }
     if (!orderId || orderId === '_') { setNotFound(true); return; }
 
     const load = async () => {
@@ -112,7 +118,7 @@ export default function InvoiceClient() {
     };
 
     load();
-  }, [orderId]);
+  }, [params]);
 
   if (notFound) {
     return (

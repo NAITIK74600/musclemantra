@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Truck, MapPin, Phone, MessageCircle, Navigation, LocateFixed,
-  Radio, PackageCheck, KeyRound, RefreshCw, LogOut, Loader2, ShieldCheck, IndianRupee,
+  Radio, PackageCheck, KeyRound, RefreshCw, LogOut, Loader2, ShieldCheck, IndianRupee, Undo2,
 } from 'lucide-react';
 
 const KEY_STORE = 'mb_delivery_key';
@@ -313,6 +313,7 @@ export default function DeliveryPanel() {
           const waPhone = phone.replace(/^\+?/, '').replace(/^0/, '');
           const busy = busyId === o.id;
           const isOut = o.status === 'Out for Delivery';
+          const isDelivered = o.status === 'Delivered';
 
           return (
             <div key={o.id} className="bg-[#0d0d0d] border border-white/8 rounded-2xl overflow-hidden">
@@ -389,7 +390,19 @@ export default function DeliveryPanel() {
                 </div>
 
                 {/* Status actions */}
-                {!isOut ? (
+                {isDelivered ? (
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                    <p className="flex items-center gap-1.5 text-emerald-400 text-[12px] font-semibold mb-2.5">
+                      <PackageCheck size={14} />
+                      Delivered successfully
+                    </p>
+                    <button onClick={() => setStatus(o.id, 'Out for Delivery')} disabled={busy}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-[12px] font-bold transition-all disabled:opacity-60 border border-white/12 bg-white/5 hover:bg-white/10">
+                      {busy ? <Loader2 size={15} className="animate-spin" /> : <Undo2 size={15} />}
+                      Undo delivery (back to Out for Delivery)
+                    </button>
+                  </div>
+                ) : !isOut ? (
                   <button onClick={() => setStatus(o.id, 'Out for Delivery')} disabled={busy}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-[13px] font-bold transition-all disabled:opacity-60"
                     style={{ background: ORANGE }}>

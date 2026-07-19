@@ -7,6 +7,8 @@ requireDelivery();
 $db = getDB();
 mm_ensure_delivery_schema($db);
 
+// Active orders the rider is working on, PLUS orders delivered in the last 24h
+// so a mistaken "Delivered" can still be rolled back from the rider panel.
 $active = ["Processing", "Packed", "Shipped", "Out for Delivery"];
 $ph = implode(",", array_fill(0, count($active), "?"));
 $st = $db->prepare(
@@ -14,8 +16,12 @@ $st = $db->prepare(
             address, city, state, pincode, total, payment_method, status,
             items, delivery_otp_at, delivered_at, rider_name,
             rider_lat, rider_lng, rider_loc_at, created_at
-     FROM orders WHERE status IN ($ph) ORDER BY
-       FIELD(status,'Out for Delivery','Shipped','Packed','Processing'), created_at DESC
+     FROM orders
+     WHERE status IN ($ph)
+        OR (status = 'Delivered' AND delivered_at >= (NOW() - INTERVAL 1 DAY))
+     ORDER BY
+       FIELD(status,'Out for Delivery','Shipped','Packed','Processing','Delivered'),
+       created_at DESC
      LIMIT 200"
 );
 $st->execute($active);
