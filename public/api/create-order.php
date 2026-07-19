@@ -58,4 +58,22 @@ try {
        ->execute([$invNum, $oid, (float)$d["total"], "issued"]);
 } catch (PDOException $e) { /* duplicate — ignore */ }
 
+// Send order-confirmation email (best-effort — never blocks the order).
+require_once __DIR__ . "/mailer.php";
+try {
+    mm_order_email([
+        "id"             => $oid,
+        "customer_name"  => $clean($d["name"] ?? ($addr["name"] ?? "")),
+        "customer_email" => $clean($d["email"] ?? ""),
+        "total"          => (float)$d["total"],
+        "status"         => $status,
+        "payment_method" => $clean($d["paymentMethod"] ?? $d["payment"] ?? "cod"),
+        "items"          => $d["items"] ?? [],
+        "address"        => $clean($addr["line1"] ?? $addr["address"] ?? ""),
+        "city"           => $clean($addr["city"] ?? ""),
+        "state"          => $clean($addr["state"] ?? ""),
+        "pincode"        => $clean($addr["pincode"] ?? ""),
+    ], "confirmation");
+} catch (Throwable $e) { /* email failure must not fail the order */ }
+
 ok(["ok" => true, "id" => $oid, "invoice" => $invNum], 201);

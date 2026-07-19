@@ -132,4 +132,127 @@ if (!function_exists('mm_send_mail')) {
             . '<p style="color:rgba(245,245,245,0.4);font-size:12px;line-height:1.5;margin:0">This code expires in 10 minutes. If you didn\'t request it, you can safely ignore this email.</p>'
             . '</div></div></div>';
     }
+
+    // ── Order emails ────────────────────────────────────────────────────────
+
+    /** Render the line-items block for an order email. */
+    function mm_order_items_html($items): string {
+        if (!is_array($items) || !$items) return '';
+        $rows = '';
+        foreach ($items as $it) {
+            $nm  = htmlspecialchars((string)($it['name'] ?? 'Item'), ENT_QUOTES);
+            $qty = (int)($it['quantity'] ?? $it['qty'] ?? 1);
+            $pr  = number_format((float)($it['price'] ?? 0) * $qty);
+            $rows .= '<tr>'
+                . '<td style="padding:8px 0;color:rgba(245,245,245,0.75);font-size:13px">' . $nm . ' × ' . $qty . '</td>'
+                . '<td style="padding:8px 0;color:#fff;font-size:13px;text-align:right">&#8377;' . $pr . '</td>'
+                . '</tr>';
+        }
+        return '<table style="width:100%;border-collapse:collapse;margin:4px 0 8px">' . $rows . '</table>';
+    }
+
+    /**
+     * Send a branded order email.
+     *  $kind ∈ 'confirmation' | 'status' | 'otp' | 'delivered'
+     * Returns true on success. Silently no-ops if the customer email is invalid.
+     */
+    function mm_order_email(array $o, string $kind, ?string $otp = null): bool {
+        $email = (string)($o['customer_email'] ?? $o['email'] ?? '');
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return false;
+
+        $id     = (string)($o['id'] ?? '');
+        $idSafe = htmlspecialchars($id, ENT_QUOTES);
+        $name   = htmlspecialchars((string)($o['customer_name'] ?? $o['name'] ?? 'there'), ENT_QUOTES);
+        $status = htmlspecialchars((string)($o['status'] ?? ''), ENT_QUOTES);
+        $total  = number_format((float)($o['total'] ?? 0));
+        $pay    = htmlspecialchars((string)($o['payment_method'] ?? ''), ENT_QUOTES);
+        $inv    = SITE_URL . '/invoice/' . rawurlencode($id) . '/';
+        $items  = $o['items'] ?? [];
+        if (is_string($items)) { $items = json_decode($items, true) ?: []; }
+
+        $addrParts = array_filter([
+            $o['address'] ?? '', $o['city'] ?? '', $o['state'] ?? '', $o['pincode'] ?? '',
+        ]);
+        $addr = htmlspecialchars(implode(', ', $addrParts), ENT_QUOTES);
+
+        // Compose subject + hero copy per kind.
+        switch ($kind) {
+            case 'otp':
+                $subject = "Delivery code for order #{$id} — Muscle Mantra";
+                $eyebrow = 'Out for delivery';
+                $title   = 'Your order is on the way!';
+                $intro   = 'Your rider is heading to you now. Share this delivery code with them <strong>only when your order arrives</strong>.';
+                break;
+            case 'delivered':
+                $subject = "Order #{$id} delivered — Muscle Mantra";
+                $eyebrow = 'Delivered';
+                $title   = 'Your order has been delivered';
+                $intro   = 'Thanks for shopping with Muscle Mantra. We hope you love your gains fuel! 💪';
+                break;
+            case 'status':
+                $subject = "Order #{$id} update: {$status} — Muscle Mantra";
+                $eyebrow = 'Order update';
+                $title   = 'Your order status changed';
+                $intro   = 'Here\'s the latest update on your order.';
+                break;
+            case 'confirmation':
+            default:
+                $subject = "Order confirmed #{$id} — Muscle Mantra";
+                $eyebrow = 'Order confirmed';
+                $title   = 'Thanks for your order!';
+                $intro   = 'We\'ve received your order and will start preparing it right away.';
+                break;
+        }
+
+        $otpBlock = '';
+        if ($kind === 'otp' && $otp) {
+            $otpSafe  = htmlspecialchars($otp, ENT_QUOTES);
+            $otpBlock = '<div style="background:#0a0a0a;border:1px solid rgba(255,107,0,0.25);border-radius:12px;text-align:center;padding:16px 0;margin:0 0 18px">'
+                . '<p style="color:rgba(245,245,245,0.5);font-size:11px;letter-spacing:2px;text-transform:uppercase;margin:0 0 6px">Delivery code</p>'
+                . '<span style="color:#fff;font-size:30px;font-weight:bold;letter-spacing:8px">' . $otpSafe . '</span>'
+                . '</div>';
+        }
+
+        $statusPill = $status
+            ? '<span style="display:inline-block;background:rgba(255,107,0,0.15);color:#FF6B00;font-size:12px;font-weight:bold;padding:4px 12px;border-radius:999px;margin:0 0 14px">' . $status . '</span>'
+            : '';
+
+        $itemsHtml = mm_order_items_html($items);
+        $itemsBlock = $itemsHtml
+            ? '<div style="border-top:1px solid rgba(255,255,255,0.08);margin:16px 0 0;padding-top:12px">'
+                . '<p style="color:rgba(245,245,245,0.5);font-size:11px;letter-spacing:2px;text-transform:uppercase;margin:0 0 4px">Items</p>'
+                . $itemsHtml
+                . '<table style="width:100%;border-top:1px solid rgba(255,255,255,0.08);margin-top:4px"><tr>'
+                . '<td style="padding:10px 0;color:#fff;font-size:14px;font-weight:bold">Total</td>'
+                . '<td style="padding:10px 0;color:#FF6B00;font-size:16px;font-weight:bold;text-align:right">&#8377;' . $total . '</td>'
+                . '</tr></table>'
+                . ($pay ? '<p style="color:rgba(245,245,245,0.4);font-size:12px;margin:2px 0 0">Payment: ' . $pay . '</p>' : '')
+                . '</div>'
+            : '';
+
+        $addrBlock = $addr
+            ? '<p style="color:rgba(245,245,245,0.45);font-size:12px;line-height:1.5;margin:14px 0 0">Delivering to:<br>' . $addr . '</p>'
+            : '';
+
+        $html = '<div style="background:#050505;padding:32px 0;font-family:Arial,Helvetica,sans-serif">'
+            . '<div style="max-width:480px;margin:0 auto;background:#0d0d0d;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden">'
+            . '<div style="height:3px;background:#FF6B00"></div>'
+            . '<div style="padding:28px 32px">'
+            . '<p style="color:#FF6B00;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;margin:0 0 6px">Muscle Mantra · ' . $eyebrow . '</p>'
+            . '<h1 style="color:#fff;font-size:21px;margin:0 0 8px">' . $title . '</h1>'
+            . '<p style="color:rgba(245,245,245,0.6);font-size:14px;line-height:1.55;margin:0 0 16px">Hi ' . $name . ', ' . $intro . '</p>'
+            . $otpBlock
+            . $statusPill
+            . '<p style="color:rgba(245,245,245,0.5);font-size:13px;margin:0 0 2px">Order <strong style="color:#fff">#' . $idSafe . '</strong></p>'
+            . $itemsBlock
+            . $addrBlock
+            . '<div style="margin:22px 0 0">'
+            . '<a href="' . htmlspecialchars($inv, ENT_QUOTES) . '" style="display:inline-block;background:#FF6B00;color:#fff;font-size:13px;font-weight:bold;text-decoration:none;padding:11px 22px;border-radius:10px">View invoice / track order</a>'
+            . '</div>'
+            . '<p style="color:rgba(245,245,245,0.3);font-size:12px;line-height:1.5;margin:22px 0 0">Need help? Just reply to this email and our team will assist you.</p>'
+            . '</div></div></div>';
+
+        return mm_send_mail($email, $subject, $html);
+    }
 }
+

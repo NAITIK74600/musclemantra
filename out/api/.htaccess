@@ -11,7 +11,7 @@
 </IfModule>
 
 # Block direct access to config and helper files
-<FilesMatch "^(_config|db|env|mailer|guard)\.php$">
+<FilesMatch "^(_config|db|env|mailer|guard|delivery-helpers)\.php$">
     Order allow,deny
     Deny from all
 </FilesMatch>

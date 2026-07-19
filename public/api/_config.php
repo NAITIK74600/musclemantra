@@ -30,6 +30,9 @@ define('PAYU_MODE', mm_env('PAYU_MODE', 'test'));   // 'test' or 'live'
 // ── Admin API Key (must match NEXT_PUBLIC_ADMIN_SETUP_KEY in .env.local) ─
 define('ADMIN_KEY', mm_env('ADMIN_KEY', 'Amarjeetmuscle@321'));
 
+// ── Delivery Rider Key (shared with riders to open /delivery panel) ──────
+define('DELIVERY_KEY', mm_env('DELIVERY_KEY', 'muscle-rider-2025'));
+
 // ── Email ─────────────────────────────────────────────────────────────────
 define('MAIL_FROM',      mm_env('MAIL_FROM',      'noreply@musclemantra.shop'));
 define('MAIL_FROM_NAME', mm_env('MAIL_FROM_NAME', 'Muscle Mantra'));
