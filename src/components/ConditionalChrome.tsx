@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import FloatingActions from './FloatingActions';
+import AnnouncementBar from './AnnouncementBar';
 
 /**
  * Hides Navbar + Footer + FloatingActions on admin routes.
@@ -19,8 +20,9 @@ export default function ConditionalChrome({ children }: { children: React.ReactN
 
   return (
     <>
+      <AnnouncementBar />
       <Navbar />
-      <main className="flex-1 pt-[60px] sm:pt-[64px] lg:pt-[104px]">{children}</main>
+      <main className="flex-1 pt-[calc(60px+var(--mm-announce-h,0px))] sm:pt-[calc(64px+var(--mm-announce-h,0px))] lg:pt-[calc(104px+var(--mm-announce-h,0px))]">{children}</main>
       <Footer />
       <FloatingActions />
     </>

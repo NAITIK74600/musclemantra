@@ -27,6 +27,8 @@ import {
   saveCategoryServer, deleteCategoryServer, uploadImageToServer,
   syncBrandsFromServer, saveBrandServer, deleteBrandServer,
   listCouponsServer, saveCouponServer, deleteCouponServer, type Coupon,
+  getHeroContent, getAnnouncement, saveSiteContentServer, syncSiteContentFromServer,
+  type HeroContent, type AnnouncementContent,
 } from '@/lib/store';
 import { parseCSV, toCSV, downloadCSV } from '@/lib/csv';
 import { useToast } from '@/components/ToastProvider';
@@ -137,13 +139,11 @@ type DemoCustomer = { name: string; email: string; orders: number; spent: string
 type DemoVendor   = { name: string; contact: string; products: number; status: string };
 type DemoReview   = { product: string; customer: string; rating: number; comment: string; status: string };
 type DemoTicket   = { id: string; customer: string; subject: string; priority: string; status: string; date: string };
-type DemoCmsPage  = { title: string; type: string; updated: string; status: string };
 
 const initialCustomers: DemoCustomer[] = [];
 const initialVendors:   DemoVendor[]   = [];
 const initialReviews:   DemoReview[]   = [];
 const initialTickets:   DemoTicket[]   = [];
-const cmsPages:         DemoCmsPage[]  = [];
 
 /* ── Change Admin Password (embedded in Settings section) ──────────────── */
 function AdminPasswordChange({ adminEmail }: { adminEmail: string }) {
@@ -715,6 +715,42 @@ function AdminDashboard() {
     toast.push({ variant: 'success', title: 'Coupon deleted' });
   };
 
+  // ── CMS: homepage hero + announcement bar (server-backed) ────────────────
+  const [heroForm, setHeroForm] = useState<HeroContent>(() => getHeroContent());
+  const [announceForm, setAnnounceForm] = useState<AnnouncementContent>(() => getAnnouncement());
+  const [savingHero, setSavingHero] = useState(false);
+  const [savingAnnounce, setSavingAnnounce] = useState(false);
+
+  const loadContent = useCallback(async () => {
+    await syncSiteContentFromServer();
+    setHeroForm(getHeroContent());
+    setAnnounceForm(getAnnouncement());
+  }, []);
+
+  const saveHero = async () => {
+    setSavingHero(true);
+    const payload: HeroContent = { ...heroForm, images: heroForm.images.map(s => s.trim()).filter(Boolean) };
+    const okSave = await saveSiteContentServer('hero', payload);
+    setSavingHero(false);
+    toast.push(okSave
+      ? { variant: 'success', title: 'Hero updated', description: 'Homepage banner saved.' }
+      : { variant: 'error', title: 'Could not save hero' });
+  };
+
+  const saveAnnounce = async () => {
+    setSavingAnnounce(true);
+    const payload: AnnouncementContent = {
+      enabled: announceForm.enabled,
+      text: announceForm.text.trim(),
+      link: announceForm.link.trim(),
+    };
+    const okSave = await saveSiteContentServer('announcement', payload);
+    setSavingAnnounce(false);
+    toast.push(okSave
+      ? { variant: 'success', title: 'Announcement saved', description: payload.enabled ? 'Bar is now live.' : 'Bar is hidden.' }
+      : { variant: 'error', title: 'Could not save announcement' });
+  };
+
   const [toggles, setToggles] = useState({
     cod: true, onlinePay: true, sameDay: true, lowStockAlerts: true, reviews: false, maintenance: false,
   });
@@ -977,6 +1013,7 @@ function AdminDashboard() {
     void syncCategoriesFromServer();
     void syncBrandsFromServer();
     void loadCoupons();
+    void loadContent();
     return off;
   }, []);
 
@@ -2706,47 +2743,91 @@ function AdminDashboard() {
 
           {/* CMS */}
           {activeSection === 'cms' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
-              <div className="flex items-center justify-between">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-3xl">
+              <div>
                 <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Content Management</h2>
-                <button className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Plus size={15} /> New Content</button>
+                <p className="text-[rgba(245,245,245,0.4)] text-sm mt-0.5">Edit your homepage banner and the announcement strip shown across the site.</p>
               </div>
-              <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)]">
-                      {['Title', 'Type', 'Last Updated', 'Status', 'Action'].map(h => (
-                        <th key={h} className="text-left px-5 py-3.5 text-[10px] font-bold tracking-widest text-[rgba(245,245,245,0.35)] uppercase">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cmsPages.length === 0 && (
-                      <tr><td colSpan={5} className="px-5 py-12 text-center text-sm text-[rgba(245,245,245,0.3)]">No content pages yet.</td></tr>
-                    )}
-                    {cmsPages.map(c => (
-                      <tr key={c.title} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-white/[0.02] transition-colors">
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] flex items-center justify-center">
-                              {c.type === 'Banner' ? <ImageIcon size={14} className="text-[rgba(245,245,245,0.35)]" /> : <FileText size={14} className="text-[rgba(245,245,245,0.35)]" />}
-                            </div>
-                            <span className="text-white text-[13px] font-semibold">{c.title}</span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 text-[rgba(245,245,245,0.5)] text-[12px]">{c.type}</td>
-                        <td className="px-5 py-3.5 text-[rgba(245,245,245,0.4)] text-[12px]">{c.updated}</td>
-                        <td className="px-5 py-3.5">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${c.status === 'published' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/20'}`}>{c.status}</span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <button className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all"><Edit2 size={13} /></button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+              {/* Announcement bar */}
+              <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-6 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Megaphone size={17} className="text-[#FF6B00]" />
+                  <h3 className="font-bold text-white">Announcement Bar</h3>
+                </div>
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input type="checkbox" checked={announceForm.enabled} onChange={e => setAnnounceForm(f => ({ ...f, enabled: e.target.checked }))} className="w-4 h-4 accent-[#FF6B00]" />
+                  <span className="text-sm text-[rgba(245,245,245,0.75)]">Show the announcement bar at the top of the site</span>
+                </label>
+                <div>
+                  <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Message</label>
+                  <input value={announceForm.text} onChange={e => setAnnounceForm(f => ({ ...f, text: e.target.value }))}
+                    placeholder="🎉 Free delivery on orders above ₹999 — shop now!" maxLength={160}
+                    className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Link (optional)</label>
+                  <input value={announceForm.link} onChange={e => setAnnounceForm(f => ({ ...f, link: e.target.value }))}
+                    placeholder="/offers  or  https://…" className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                  <p className="text-[11px] text-[rgba(245,245,245,0.35)] mt-1.5">Use a page path like <span className="text-[#FF6B00]">/offers</span> or a full <span className="text-[#FF6B00]">https://</span> link.</p>
+                </div>
+                {announceForm.enabled && announceForm.text.trim() && (
+                  <div className="h-9 flex items-center justify-center bg-[#FF6B00] text-white text-[13px] font-semibold rounded-lg px-4 truncate">{announceForm.text}</div>
+                )}
+                <button onClick={saveAnnounce} disabled={savingAnnounce}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all disabled:opacity-50">
+                  {savingAnnounce ? <><Loader2 size={15} className="animate-spin" /> Saving…</> : <><Save size={15} /> Save Announcement</>}
+                </button>
               </div>
+
+              {/* Homepage hero */}
+              <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-6 space-y-4">
+                <div className="flex items-center gap-2">
+                  <ImageIcon size={17} className="text-[#FF6B00]" />
+                  <h3 className="font-bold text-white">Homepage Banner (Hero)</h3>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Top small line</label>
+                  <input value={heroForm.eyebrow} onChange={e => setHeroForm(f => ({ ...f, eyebrow: e.target.value }))}
+                    className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                </div>
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Kicker</label>
+                    <input value={heroForm.headingTop} onChange={e => setHeroForm(f => ({ ...f, headingTop: e.target.value }))}
+                      className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Headline</label>
+                    <input value={heroForm.headingMain} onChange={e => setHeroForm(f => ({ ...f, headingMain: e.target.value }))}
+                      className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Highlight word</label>
+                    <input value={heroForm.headingAccent} onChange={e => setHeroForm(f => ({ ...f, headingAccent: e.target.value }))}
+                      className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Sub-heading</label>
+                  <textarea value={heroForm.subheading} onChange={e => setHeroForm(f => ({ ...f, subheading: e.target.value }))} rows={3}
+                    className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)] resize-y" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Background images (one URL per line)</label>
+                  <textarea value={heroForm.images.join('\n')} onChange={e => setHeroForm(f => ({ ...f, images: e.target.value.split('\n') }))} rows={2}
+                    placeholder={'/hero-1.jpg\n/hero-2.jpg'} className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white font-mono outline-none focus:border-[rgba(255,107,0,0.4)] resize-y" />
+                  <p className="text-[11px] text-[rgba(245,245,245,0.35)] mt-1.5">Use existing files like <span className="text-[#FF6B00]">/hero-1.jpg</span> or full <span className="text-[#FF6B00]">https://</span> image links. Two or more images auto-rotate.</p>
+                </div>
+                <button onClick={saveHero} disabled={savingHero}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all disabled:opacity-50">
+                  {savingHero ? <><Loader2 size={15} className="animate-spin" /> Saving…</> : <><Save size={15} /> Save Hero</>}
+                </button>
+              </div>
+
+              <p className="text-[12px] text-[rgba(245,245,245,0.4)]">
+                Policy pages (Terms, Privacy, Refund, Delivery, Cancellation, About, Contact) are already live and editable in code. Ask your developer if you want any of those made editable here too.
+              </p>
             </motion.div>
           )}
 

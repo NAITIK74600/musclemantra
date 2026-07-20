@@ -865,6 +865,89 @@ export async function validateCouponServer(code: string, subtotal: number): Prom
   } catch { return { ok: false, message: 'Network error' }; }
 }
 
+/* ── Site content (CMS) ────────────────────────────────────────────────────
+   Editable homepage hero + top announcement bar. Content is stored server-side
+   (site_content table) and cached in localStorage for instant, offline-safe
+   render. Admin edits go through saveSiteContentServer. */
+
+const CONTENT_KEY = 'mb_site_content_v1';
+
+export type HeroContent = {
+  eyebrow: string;
+  headingTop: string;    // small orange kicker line ("Muscle Mantra")
+  headingMain: string;   // large headline line 1 ("Fuel Your")
+  headingAccent: string; // large headline line 2, gradient ("Strength")
+  subheading: string;
+  images: string[];      // rotating background images
+};
+
+export type AnnouncementContent = {
+  enabled: boolean;
+  text: string;
+  link: string;
+};
+
+export type SiteContent = {
+  hero?: Partial<HeroContent>;
+  announcement?: Partial<AnnouncementContent>;
+  [key: string]: unknown;
+};
+
+export const defaultHero: HeroContent = {
+  eyebrow: "100% Authentic · Patna's Supplement Store",
+  headingTop: 'Muscle Mantra',
+  headingMain: 'Fuel Your',
+  headingAccent: 'Strength',
+  subheading:
+    "Muscle Mantra is Patna's trusted online supplement store. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer & BCAA — sourced directly from official brands, at unbeatable prices with fast, reliable doorstep delivery across Patna.",
+  images: ['/hero-1.jpg', '/hero-2.jpg'],
+};
+
+export const defaultAnnouncement: AnnouncementContent = {
+  enabled: false,
+  text: '',
+  link: '',
+};
+
+/** Read the cached site content synchronously (for instant render). */
+export const getSiteContent = (): SiteContent => read<SiteContent>(CONTENT_KEY, {});
+
+/** Merged hero content — saved overrides on top of the built-in defaults. */
+export function getHeroContent(): HeroContent {
+  const c = getSiteContent().hero ?? {};
+  const imgs = Array.isArray(c.images) ? c.images.filter(Boolean) as string[] : [];
+  return { ...defaultHero, ...c, images: imgs.length ? imgs : defaultHero.images };
+}
+
+/** Merged announcement-bar content. */
+export function getAnnouncement(): AnnouncementContent {
+  return { ...defaultAnnouncement, ...(getSiteContent().announcement ?? {}) };
+}
+
+/** Pull the live site content from the server into the local cache. */
+export async function syncSiteContentFromServer(): Promise<void> {
+  try {
+    const res = await fetch('/api/content/get');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.content && typeof data.content === 'object') {
+      write(CONTENT_KEY, data.content as SiteContent);
+    }
+  } catch { /* ignore */ }
+}
+
+/** Admin: save one content section to the server and refresh the local cache. */
+export async function saveSiteContentServer(key: string, value: unknown): Promise<boolean> {
+  try {
+    const res = await fetch('/api/content/save', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ key, value }),
+    });
+    if (res.ok) write(CONTENT_KEY, { ...getSiteContent(), [key]: value });
+    return res.ok;
+  } catch { return false; }
+}
+
 /**
  * Upload an image file to the server and return its public https URL (or null).
  * Used for product + category images so they persist and sync across devices —

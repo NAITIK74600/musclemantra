@@ -268,7 +268,7 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.9)]">
+      <header className="fixed top-[var(--mm-announce-h,0px)] left-0 right-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.9)]">
         {/* â”€â”€ Row 1 â”€â”€ */}
         <div className="bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)]">
           <div className="container-max py-2 lg:py-2.5 flex items-center gap-2 sm:gap-3">

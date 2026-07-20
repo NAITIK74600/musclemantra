@@ -11,8 +11,8 @@ import {
 import {
   getBrands, getPromos, getProducts, getCategories, onStoreChange,
   defaultBrands, defaultPromos, defaultAdminProducts, defaultCategories,
-  syncBrandsFromServer,
-  type Brand, type Promo, type AdminProduct, type AdminCategory,
+  syncBrandsFromServer, getHeroContent, syncSiteContentFromServer,
+  type Brand, type Promo, type AdminProduct, type AdminCategory, type HeroContent,
 } from '@/lib/store';
 import ProductCard from './ProductCard';
 import { useToast } from './ToastProvider';
@@ -103,18 +103,27 @@ function SectionHeader({
 const HERO_IMAGES = ['/hero-1.jpg', '/hero-2.jpg'];
 
 function HeroSection() {
+  const [hero, setHero] = useState<HeroContent>(() => getHeroContent());
+  const heroImages = hero.images.length ? hero.images : HERO_IMAGES;
   const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setActiveIdx(i => (i + 1) % HERO_IMAGES.length), 5000);
-    return () => clearInterval(id);
+    const refresh = () => { setHero(getHeroContent()); setActiveIdx(0); };
+    void syncSiteContentFromServer().then(refresh);
+    return onStoreChange(refresh);
   }, []);
+
+  useEffect(() => {
+    if (heroImages.length < 2) return;
+    const id = setInterval(() => setActiveIdx(i => (i + 1) % heroImages.length), 5000);
+    return () => clearInterval(id);
+  }, [heroImages.length]);
 
   return (
     <section className="relative overflow-hidden" style={{ minHeight: 'min(88vh, 640px)' }}>
       {/* Sliding background images */}
-      {HERO_IMAGES.map((src, i) => (
-        <div key={src} className="absolute inset-0 transition-opacity duration-1000"
+      {heroImages.map((src, i) => (
+        <div key={src + i} className="absolute inset-0 transition-opacity duration-1000"
           style={{ opacity: i === activeIdx ? 1 : 0, backgroundImage: `url('${src}')`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
       ))}
 
@@ -126,7 +135,7 @@ function HeroSection() {
 
       {/* Slide dots */}
       <div className="absolute bottom-6 right-5 sm:bottom-8 sm:right-8 z-20 flex gap-2">
-        {HERO_IMAGES.map((_, i) => (
+        {heroImages.map((_, i) => (
           <button key={i} onClick={() => setActiveIdx(i)} aria-label={`Slide ${i + 1}`}
             className={`h-2 rounded-full transition-all ${i === activeIdx ? 'bg-[#FF6B00] w-6' : 'w-2 bg-white/30 hover:bg-white/60'}`} />
         ))}
@@ -140,24 +149,24 @@ function HeroSection() {
             <ClientMotion initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
               className="inline-flex items-center gap-2 mb-5 sm:mb-6 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10">
               <CheckCircle2 size={13} className="text-[#FF6B00]" />
-              <span className="text-[10.5px] sm:text-[11px] font-semibold text-white/90 tracking-wide">100% Authentic · Patna&apos;s Supplement Store</span>
+              <span className="text-[10.5px] sm:text-[11px] font-semibold text-white/90 tracking-wide">{hero.eyebrow}</span>
             </ClientMotion>
 
             {/* Headline — H1 explicitly starts with "Muscle Mantra" (both cases) to match OAuth app name */}
             <ClientMotion as="h1" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.6 }}
               className="font-[var(--font-montserrat)] font-black uppercase leading-[0.95] tracking-tight mb-4 sm:mb-5 text-white">
               <span className="block text-[#FF6B00] text-[15px] sm:text-[16px] font-black tracking-[0.28em] mb-2 sm:mb-3">
-                Muscle Mantra
+                {hero.headingTop}
               </span>
               <span className="block" style={{ fontSize: 'clamp(2.25rem, 5.4vw + 0.5rem, 5rem)' }}>
-                Fuel Your<br />
-                <span className="text-gradient">Strength</span>
+                {hero.headingMain}<br />
+                <span className="text-gradient">{hero.headingAccent}</span>
               </span>
             </ClientMotion>
 
             <ClientMotion as="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
               className="text-white/70 text-[14.5px] sm:text-base md:text-lg mb-6 sm:mb-7 leading-relaxed max-w-lg">
-              <strong className="text-white/90 font-semibold">Muscle Mantra</strong>{' '}is Patna&apos;s trusted online supplement store. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA — sourced directly from official brands, at unbeatable prices with fast, reliable doorstep delivery across Patna.
+              {hero.subheading}
             </ClientMotion>
 
             {/* CTAs */}
