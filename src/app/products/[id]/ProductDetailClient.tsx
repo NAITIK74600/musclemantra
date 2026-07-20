@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -12,10 +11,15 @@ import { useCart } from '@/components/CartProvider';
 import ProductCard from '@/components/ProductCard';
 
 export default function ProductDetailClient() {
-  const { id } = useParams<{ id: string }>();
+  // On the static-export SPA fallback this page is prerendered for id="_", so
+  // useParams()/route params resolve to "_" on a hard load — never the real id.
+  // Read the actual product id straight from the browser URL instead.
+  const [id, setId] = useState<string>('');
   const [catalogue, setCatalogue] = useState<AdminProduct[] | null>(null);
   const [synced, setSynced] = useState(false);
   useEffect(() => {
+    const seg = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).pop() || '');
+    setId(seg === '_' ? '' : seg);
     setCatalogue(getProducts());
     const unsub = onStoreChange(() => setCatalogue(getProducts()));
     // Always pull the live catalogue so direct visits, fresh browsers and
