@@ -47,17 +47,44 @@ if (!function_exists('mm_invoice_pdf')) {
             $c .= "{$color} rg {$x} {$y} {$w} {$h} re f\n";
         };
 
-        // ── Header ───────────────────────────────────────────────────────
-        $y = $H - 55;
-        $text($M, $y, 22, 'F2', 'MUSCLE MANTRA', $orange);
-        $text($M, $y - 15, 8, 'F1', 'FUEL YOUR STRENGTH', $gray);
-        $textR($W - $M, $y, 11, 'F2', 'INVOICE', $gray);
-        $textR($W - $M, $y - 17, 15, 'F2', '#' . ($o['id'] ?? ''), $dark);
+        // ── Header (dark brand band + embedded logo) ─────────────────────
+        // Load the branding logo JPEG (baseline) for embedding as an image XObject.
+        $logoBytes = ''; $imgW = 0; $imgH = 0; $hasLogo = false;
+        $logoPath = __DIR__ . '/logo-invoice.jpg';
+        if (is_file($logoPath)) {
+            $lb = @file_get_contents($logoPath);
+            if (is_string($lb) && $lb !== '') {
+                $sz = @getimagesizefromstring($lb);
+                if ($sz && (int)$sz[2] === IMAGETYPE_JPEG) {
+                    $logoBytes = $lb; $imgW = (int)$sz[0]; $imgH = (int)$sz[1]; $hasLogo = true;
+                }
+            }
+        }
+
+        $bandH = 118;
+        $rect(0, $H - $bandH, $W, $bandH, '0.055 0.055 0.055');   // dark brand band
+        $rect(0, $H - $bandH - 4, $W, 4, $orange);                // orange accent strip
+
+        if ($hasLogo) {
+            $logoH = 82;
+            $logoW = $logoH * ($imgW / $imgH);
+            $logoX = $M;
+            $logoY = $H - ($bandH / 2) - ($logoH / 2);
+            $c .= 'q ' . round($logoW, 2) . ' 0 0 ' . $logoH . ' ' . round($logoX, 2)
+                . ' ' . round($logoY, 2) . " cm /Im1 Do Q\n";
+        } else {
+            $text($M, $H - 52, 22, 'F2', 'MUSCLE MANTRA', $orange);
+            $text($M, $H - 67, 8, 'F1', 'FUEL YOUR STRENGTH', '0.6 0.6 0.6');
+        }
+
+        $white = '0.95 0.95 0.95';
+        $textR($W - $M, $H - 46, 10, 'F2', 'INVOICE', $orange);
+        $textR($W - $M, $H - 66, 16, 'F2', '#' . ($o['id'] ?? ''), $white);
         $rawDate = (string)($o['created_at'] ?? $o['createdAt'] ?? '');
         $ts = $rawDate ? strtotime($rawDate) : false;
-        $textR($W - $M, $y - 33, 9, 'F1', date('d M Y', $ts ?: time()), $gray);
-        $rect($M, $y - 44, $W - 2 * $M, 2, $orange);
-        $y -= 72;
+        $textR($W - $M, $H - 84, 9, 'F1', date('d M Y', $ts ?: time()), '0.6 0.6 0.6');
+
+        $y = $H - $bandH - 34;
 
         // ── Bill To / Ship To ────────────────────────────────────────────
         $text($M, $y, 9, 'F2', 'BILL TO', $orange);
@@ -142,11 +169,18 @@ if (!function_exists('mm_invoice_pdf')) {
         $objects = [];
         $objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
         $objects[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
+        $xobjRes = $hasLogo ? ' /XObject << /Im1 7 0 R >>' : '';
         $objects[3] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' . $W . ' ' . $H . ']'
-            . ' /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>';
+            . ' /Resources << /Font << /F1 5 0 R /F2 6 0 R >>' . $xobjRes . ' >> /Contents 4 0 R >>';
         $objects[4] = '<< /Length ' . strlen($c) . " >>\nstream\n" . $c . "endstream";
         $objects[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
         $objects[6] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+        if ($hasLogo) {
+            $objects[7] = '<< /Type /XObject /Subtype /Image /Width ' . $imgW
+                . ' /Height ' . $imgH . ' /ColorSpace /DeviceRGB /BitsPerComponent 8'
+                . ' /Filter /DCTDecode /Length ' . strlen($logoBytes) . " >>\nstream\n"
+                . $logoBytes . "\nendstream";
+        }
 
         $pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
         $offsets = [];

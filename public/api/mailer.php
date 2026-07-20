@@ -289,18 +289,21 @@ if (!function_exists('mm_send_mail')) {
             ? '<p style="color:rgba(245,245,245,0.45);font-size:12px;line-height:1.5;margin:14px 0 0">Delivering to:<br>' . $addr . '</p>'
             : '';
 
-        // Generate the invoice PDF and attach it (best-effort — never fails the email).
+        // Attach the invoice PDF ONLY on the delivered email — not on every status update.
+        // (Best-effort — never fails the email.)
         $invoiceAttachment = [];
-        try {
-            $pdfBytes = mm_invoice_pdf($o);
-            if (is_string($pdfBytes) && $pdfBytes !== '') {
-                $invoiceAttachment[] = [
-                    'name' => 'Invoice-' . preg_replace('/[^A-Za-z0-9]/', '', $id) . '.pdf',
-                    'mime' => 'application/pdf',
-                    'data' => $pdfBytes,
-                ];
-            }
-        } catch (Throwable $e) { /* skip attachment on any error */ }
+        if ($kind === 'delivered') {
+            try {
+                $pdfBytes = mm_invoice_pdf($o);
+                if (is_string($pdfBytes) && $pdfBytes !== '') {
+                    $invoiceAttachment[] = [
+                        'name' => 'Invoice-' . preg_replace('/[^A-Za-z0-9]/', '', $id) . '.pdf',
+                        'mime' => 'application/pdf',
+                        'data' => $pdfBytes,
+                    ];
+                }
+            } catch (Throwable $e) { /* skip attachment on any error */ }
+        }
 
         $html = '<div style="background:#050505;padding:32px 0;font-family:Arial,Helvetica,sans-serif">'
             . '<div style="max-width:480px;margin:0 auto;background:#0d0d0d;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden">'
