@@ -156,7 +156,7 @@ function HeroSection() {
 
             <ClientMotion as="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
               className="text-white/70 text-[14.5px] sm:text-base md:text-lg mb-6 sm:mb-7 leading-relaxed max-w-lg">
-              <strong className="text-white/90 font-semibold">Muscle Mantra</strong> is an online supplement e-commerce store based in India. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA — sourced directly from official brands, with unbeatable prices and fast doorstep delivery across India.
+              <strong className="text-white/90 font-semibold">Muscle Mantra</strong> is Patna&apos;s trusted online supplement store. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA — sourced directly from official brands, at unbeatable prices with fast, reliable doorstep delivery across Patna.
             </ClientMotion>
 
             {/* CTAs */}
@@ -196,10 +196,10 @@ function HeroSection() {
 function TrustStrip() {
   const items = [
     { icon: Shield, title: '100% Authentic', sub: 'Sourced directly from brands' },
-    { icon: Truck, title: '30-Min Delivery', sub: 'Across all of Patna' },
+    { icon: Truck, title: 'Fast Delivery', sub: 'Across all of Patna' },
     { icon: Tag, title: 'Best Prices', sub: 'Lowest price guarantee' },
-    { icon: RotateCcw, title: 'Easy Returns', sub: '7-day hassle-free returns' },
-    { icon: HeadphonesIcon, title: 'Expert Support', sub: '24Ã—7 nutrition guidance' },
+    { icon: RotateCcw, title: 'Easy Returns', sub: 'On damaged or wrong items' },
+    { icon: HeadphonesIcon, title: 'Expert Support', sub: '24x7 nutrition guidance' },
   ];
   return (
     <section className="bg-[#0d0d0d] border-b border-[rgba(255,255,255,0.06)]">
@@ -479,7 +479,7 @@ function TopBrandsSection() {
 function WhyChooseUs() {
   const points = [
     { icon: Shield, title: 'Lab-Verified Authenticity', desc: 'Every product is sourced directly from authorised distributors and scan-verified for genuineness.' },
-    { icon: Truck, title: 'Fast Doorstep Delivery', desc: 'Quick, reliable dispatch with fast doorstep delivery across India — no long waits.' },
+    { icon: Truck, title: 'Fast Doorstep Delivery', desc: 'Quick, reliable dispatch with fast doorstep delivery across Patna — no long waits.' },
     { icon: Award, title: 'Expert-Curated Range', desc: 'Hand-picked products and stacks recommended by certified nutritionists and trainers.' },
   ];
   return (

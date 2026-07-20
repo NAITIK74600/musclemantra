@@ -18,6 +18,7 @@ const footerLinks: Record<string, { label: string; href: string }[]> = {
   Legal: [
     { label: 'Privacy Policy', href: '/privacy-policy' },
     { label: 'Terms & Conditions', href: '/terms' },
+    { label: 'Delivery Policy', href: '/delivery-policy' },
     { label: 'Refund Policy', href: '/refund-policy' },
   ],
 };
@@ -35,7 +36,7 @@ export default function Footer() {
               <span className="font-black text-lg text-white tracking-tight">MUSCLE MANTRA</span>
             </Link>
             <p className="text-[13.5px] sm:text-sm text-white/50 leading-relaxed mb-5 max-w-[320px]">
-              Patna&apos;s trusted supplement store. 100% authentic products, fast delivery across India.
+              Patna&apos;s trusted supplement store. 100% authentic products, fast delivery across Patna.
             </p>
             <div className="flex flex-col gap-2.5 text-[13px] text-white/55">
               <a href="tel:+918409612737" className="inline-flex items-center gap-2 hover:text-[#FF6B00] transition-colors">
