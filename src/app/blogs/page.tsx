@@ -1,13 +1,13 @@
-import ComingSoon from '@/components/ComingSoon';
+import type { Metadata } from 'next';
+import BlogsClient from './BlogsClient';
 
-export const metadata = { title: 'Blogs — Muscle Mantra' };
+export const metadata: Metadata = {
+  title: 'Blogs — Fitness & Nutrition Insights | Muscle Mantra',
+  description:
+    'Science-backed guides on training, supplementation and nutrition. Learn about protein timing, creatine, pre-workouts, fat loss and recovery from Muscle Mantra.',
+  alternates: { canonical: 'https://musclemantra.shop/blogs' },
+};
 
 export default function BlogsPage() {
-  return (
-    <ComingSoon
-      eyebrow="Blogs"
-      title="Fitness & Nutrition Insights"
-      description="Expert guides on training, supplementation, and nutrition are coming soon. Stay tuned for science-backed tips to fuel your goals."
-    />
-  );
+  return <BlogsClient />;
 }

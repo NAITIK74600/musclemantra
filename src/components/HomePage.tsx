@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import {
   Shield, Tag, HeadphonesIcon, RotateCcw, Truck,
-  Flame, Award, CheckCircle2, ArrowRight, MapPin, Star,
+  Flame, Award, CheckCircle2, ArrowRight, MapPin, Star, Dumbbell,
 } from 'lucide-react';
 import {
   getBrands, getPromos, getProducts, getCategories, onStoreChange,
@@ -175,6 +175,11 @@ function HeroSection() {
               <Link href="/stack-builder"
                 className="inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 bg-white/5 backdrop-blur-md border border-white/15 text-white font-bold rounded-xl text-[12.5px] sm:text-sm tracking-wide uppercase hover:bg-white/10 transition-all">
                 Build Your Stack
+              </Link>
+              <Link href="/trainers"
+                className="group inline-flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 bg-white/5 backdrop-blur-md border border-[#FF6B00]/40 text-white font-bold rounded-xl text-[12.5px] sm:text-sm tracking-wide uppercase hover:bg-[#FF6B00]/10 hover:border-[#FF6B00] transition-all">
+                <Dumbbell size={16} className="text-[#FF6B00]" />
+                Book a Trainer
               </Link>
             </ClientMotion>
 

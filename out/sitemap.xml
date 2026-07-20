@@ -25,6 +25,14 @@
     <priority>0.8</priority>
   </url>
 
+  <!-- Personal Trainers -->
+  <url>
+    <loc>https://musclemantra.shop/trainers/</loc>
+    <lastmod>2026-07-19</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
   <!-- Offers -->
   <url>
     <loc>https://musclemantra.shop/offers/</loc>

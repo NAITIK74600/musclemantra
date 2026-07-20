@@ -11,6 +11,7 @@ const footerLinks: Record<string, { label: string; href: string }[]> = {
   ],
   Company: [
     { label: 'About Us', href: '/about' },
+    { label: 'Personal Trainers', href: '/trainers' },
     { label: 'Contact', href: '/contact' },
     { label: 'Track Order', href: '/orders' },
   ],

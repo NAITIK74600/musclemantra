@@ -305,3 +305,219 @@ export const updateCategory = (id: string, patch: Partial<AdminCategory>): Admin
 export const deleteCategory = (id: string) => {
   saveCategories(getCategories().filter(c => c.id !== id));
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Personal Trainers + Training Plans (admin-managed)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type Trainer = {
+  id: string;
+  name: string;
+  specialty: string;   // e.g. "Strength & Conditioning"
+  experience: number;  // years
+  bio: string;
+  image?: string;
+  rating: number;      // 0–5
+  active: boolean;
+};
+
+export type TrainingPlan = {
+  id: string;
+  name: string;        // e.g. "1-on-1 Personal Training"
+  tagline: string;     // short one-liner
+  price: number;       // current price (₹)
+  oldPrice: number;    // strike-through price (0 = hide)
+  period: string;      // e.g. "per month", "8 sessions", "3 months"
+  features: string[];  // bullet list
+  popular: boolean;    // highlight as "Most Popular"
+  active: boolean;
+};
+
+const TRAINERS_KEY = 'mb_trainers_v1';
+const PLANS_KEY = 'mb_plans_v1';
+
+export const defaultTrainers: Trainer[] = [
+  {
+    id: 't1',
+    name: 'Rahul Verma',
+    specialty: 'Strength & Muscle Building',
+    experience: 8,
+    bio: 'Certified strength coach specialising in hypertrophy, powerlifting and body recomposition. Helped 500+ clients hit their goals.',
+    image: 'https://images.unsplash.com/photo-1567013127542-490d757e51fc?w=500&q=80',
+    rating: 4.9,
+    active: true,
+  },
+  {
+    id: 't2',
+    name: 'Anjali Singh',
+    specialty: 'Weight Loss & Nutrition',
+    experience: 6,
+    bio: 'Fat-loss and nutrition expert. Builds sustainable diet + training plans tailored to your lifestyle and food preferences.',
+    image: 'https://images.unsplash.com/photo-1594381898411-846e7d193883?w=500&q=80',
+    rating: 4.8,
+    active: true,
+  },
+  {
+    id: 't3',
+    name: 'Vikram Yadav',
+    specialty: 'Functional & Athletic Training',
+    experience: 10,
+    bio: 'Ex-athlete and functional-training specialist focused on mobility, conditioning and injury-free performance.',
+    image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=500&q=80',
+    rating: 5.0,
+    active: true,
+  },
+];
+
+export const defaultPlans: TrainingPlan[] = [
+  {
+    id: 'pl1',
+    name: 'Starter Session',
+    tagline: 'Try a single 1-on-1 session',
+    price: 499,
+    oldPrice: 799,
+    period: 'per session',
+    features: ['1 one-on-one session', 'Fitness assessment', 'Form correction', 'Personalised advice'],
+    popular: false,
+    active: true,
+  },
+  {
+    id: 'pl2',
+    name: 'Personal Training',
+    tagline: 'Most popular — dedicated coaching',
+    price: 3999,
+    oldPrice: 5999,
+    period: 'per month',
+    features: ['12 sessions / month', 'Custom workout plan', 'Diet & nutrition plan', 'WhatsApp support', 'Weekly progress tracking'],
+    popular: true,
+    active: true,
+  },
+  {
+    id: 'pl3',
+    name: 'Transformation',
+    tagline: '3-month body transformation',
+    price: 9999,
+    oldPrice: 15999,
+    period: '3 months',
+    features: ['Everything in Personal Training', 'Priority scheduling', 'Supplement guidance', 'Monthly InBody analysis', 'Guaranteed results'],
+    popular: false,
+    active: true,
+  },
+];
+
+function sanitizeTrainer(t: Trainer): Trainer {
+  return {
+    id: String(t.id ?? uid()).slice(0, 40) || uid(),
+    name: String(t.name ?? '').slice(0, 80),
+    specialty: String(t.specialty ?? '').slice(0, 100),
+    experience: Math.max(0, Math.min(60, Math.floor(Number(t.experience) || 0))),
+    bio: String(t.bio ?? '').slice(0, 600),
+    image: sanitizeImageUrl(t.image),
+    rating: Math.max(0, Math.min(5, Number(t.rating) || 0)),
+    active: t.active !== false,
+  };
+}
+
+function sanitizePlan(p: TrainingPlan): TrainingPlan {
+  return {
+    id: String(p.id ?? uid()).slice(0, 40) || uid(),
+    name: String(p.name ?? '').slice(0, 80),
+    tagline: String(p.tagline ?? '').slice(0, 140),
+    price: Math.max(0, Math.floor(Number(p.price) || 0)),
+    oldPrice: Math.max(0, Math.floor(Number(p.oldPrice) || 0)),
+    period: String(p.period ?? '').slice(0, 40),
+    features: (p.features ?? []).map(f => String(f).slice(0, 120)).slice(0, 12),
+    popular: p.popular === true,
+    active: p.active !== false,
+  };
+}
+
+export const getTrainers = (): Trainer[] => {
+  const raw = read<Trainer[] | null>(TRAINERS_KEY, null);
+  if (raw && Array.isArray(raw)) return raw;
+  write(TRAINERS_KEY, defaultTrainers);
+  return defaultTrainers;
+};
+
+export const saveTrainers = (list: Trainer[]) => {
+  write(TRAINERS_KEY, list.map(sanitizeTrainer));
+};
+
+export const addTrainer = (t: Omit<Trainer, 'id'> & { id?: string }): Trainer => {
+  const next = sanitizeTrainer({ ...t, id: t.id ?? 't_' + uid() } as Trainer);
+  saveTrainers([...getTrainers(), next]);
+  return next;
+};
+
+export const updateTrainer = (id: string, patch: Partial<Trainer>): Trainer | null => {
+  let updated: Trainer | null = null;
+  const next = getTrainers().map(t => {
+    if (t.id !== id) return t;
+    updated = sanitizeTrainer({ ...t, ...patch });
+    return updated;
+  });
+  saveTrainers(next);
+  return updated;
+};
+
+export const deleteTrainer = (id: string) => {
+  saveTrainers(getTrainers().filter(t => t.id !== id));
+};
+
+export const getPlans = (): TrainingPlan[] => {
+  const raw = read<TrainingPlan[] | null>(PLANS_KEY, null);
+  if (raw && Array.isArray(raw)) return raw;
+  write(PLANS_KEY, defaultPlans);
+  return defaultPlans;
+};
+
+export const savePlans = (list: TrainingPlan[]) => {
+  write(PLANS_KEY, list.map(sanitizePlan));
+};
+
+export const addPlan = (p: Omit<TrainingPlan, 'id'> & { id?: string }): TrainingPlan => {
+  const next = sanitizePlan({ ...p, id: p.id ?? 'pl_' + uid() } as TrainingPlan);
+  savePlans([...getPlans(), next]);
+  return next;
+};
+
+export const updatePlan = (id: string, patch: Partial<TrainingPlan>): TrainingPlan | null => {
+  let updated: TrainingPlan | null = null;
+  const next = getPlans().map(p => {
+    if (p.id !== id) return p;
+    updated = sanitizePlan({ ...p, ...patch });
+    return updated;
+  });
+  savePlans(next);
+  return updated;
+};
+
+export const deletePlan = (id: string) => {
+  savePlans(getPlans().filter(p => p.id !== id));
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wishlist (persisted list of product IDs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const WISHLIST_KEY = 'mb_wishlist_v1';
+
+export const getWishlist = (): string[] => {
+  const raw = read<string[] | null>(WISHLIST_KEY, null);
+  return Array.isArray(raw) ? raw.filter(x => typeof x === 'string') : [];
+};
+
+export const isWished = (id: string): boolean => getWishlist().includes(id);
+
+export const toggleWishlist = (id: string): boolean => {
+  const list = getWishlist();
+  const has = list.includes(id);
+  const next = has ? list.filter(x => x !== id) : [...list, id];
+  write(WISHLIST_KEY, next);
+  return !has; // new wished state
+};
+
+export const removeWishlist = (id: string) => {
+  write(WISHLIST_KEY, getWishlist().filter(x => x !== id));
+};
+

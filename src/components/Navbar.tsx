@@ -122,6 +122,7 @@ const menuLinks = [
   { label: 'CATEGORIES', href: '/products', sub: ['Protein', 'Creatine', 'Pre-Workout', 'Mass Gainer', 'BCAA', 'Vitamins', 'Fat Burners', 'Accessories'] },
   { label: 'BRANDS', href: '/brands' },
   { label: 'STACK BUILDER', href: '/stack-builder' },
+  { label: 'TRAINERS', href: '/trainers' },
   { label: 'OFFERS', href: '/offers' },
   { label: 'SERVICES', href: '/services' },
   { label: 'ABOUT', href: '/about' },

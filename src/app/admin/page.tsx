@@ -12,6 +12,7 @@ import {
   MessageSquare, Save, Plus, Image as ImageIcon,
   Megaphone, Film, Upload, Award, Play, LayoutGrid, Minus,
   Loader2, KeyRound, Shield, UserPlus, MailCheck, Crown,
+  Dumbbell, Calendar, Clock, Phone, RefreshCw,
 } from 'lucide-react';
 import {
   getBrands, saveBrands, getPromos, savePromos, fileToDataURL, uid,
@@ -19,6 +20,8 @@ import {
   updateBrand,
   getProducts, saveProducts, addProduct, updateProduct, deleteProduct, type AdminProduct,
   getCategories, saveCategories, addCategory, updateCategory, deleteCategory, type AdminCategory,
+  getTrainers, addTrainer, updateTrainer, deleteTrainer, type Trainer,
+  getPlans, addPlan, updatePlan, deletePlan, type TrainingPlan,
 } from '@/lib/store';
 import { useToast } from '@/components/ToastProvider';
 import AdminGate from '@/components/AdminGate';
@@ -34,6 +37,7 @@ const sidebarItems = [
   { id: 'categories',    icon: LayoutGrid,        label: 'Categories' },
   { id: 'promotions',    icon: Megaphone,         label: 'Promotions' },
   { id: 'brands',        icon: Award,             label: 'Brands' },
+  { id: 'trainers',      icon: Dumbbell,          label: 'Personal Trainers' },
   { id: 'inventory',     icon: Warehouse,         label: 'Inventory' },
   { id: 'customers',     icon: Users,             label: 'Customers' },
   { id: 'vendors',       icon: Store,             label: 'Vendors' },
@@ -263,6 +267,314 @@ function AdminsSection() {
           </div>
         )}
       </div>
+    </motion.div>
+  );
+}
+
+type TrainerBooking = {
+  id: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  trainer_name?: string;
+  plan_name?: string;
+  plan_price?: number;
+  preferred_date?: string;
+  preferred_time?: string;
+  goal?: string;
+  status: string;
+  created_at?: string;
+};
+
+const BOOKING_STATUSES = ['Pending', 'Confirmed', 'Completed', 'Cancelled'];
+
+function TrainersSection() {
+  const toast = useToast();
+  const ADMIN_KEY_VAL = process.env.NEXT_PUBLIC_ADMIN_SETUP_KEY ?? '';
+
+  const [tab, setTab] = useState<'bookings' | 'trainers' | 'plans'>('bookings');
+  const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [plans, setPlans] = useState<TrainingPlan[]>([]);
+  const [bookings, setBookings] = useState<TrainerBooking[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+
+  const reloadStore = useCallback(() => {
+    setTrainers(getTrainers());
+    setPlans(getPlans());
+  }, []);
+
+  useEffect(() => { reloadStore(); return onStoreChange(reloadStore); }, [reloadStore]);
+
+  const fetchBookings = useCallback(async () => {
+    setBookingsLoading(true);
+    try {
+      const res = await fetch('/api/book-trainer', { headers: { 'x-admin-key': ADMIN_KEY_VAL } });
+      if (res.ok) {
+        const data = await res.json();
+        setBookings(Array.isArray(data.bookings) ? data.bookings : []);
+      }
+    } catch { /* ignore */ }
+    finally { setBookingsLoading(false); }
+  }, [ADMIN_KEY_VAL]);
+
+  useEffect(() => { fetchBookings(); }, [fetchBookings]);
+
+  const setStatus = async (id: string, status: string) => {
+    setBookings(list => list.map(b => (b.id === id ? { ...b, status } : b)));
+    try {
+      await fetch('/api/book-trainer', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
+        body: JSON.stringify({ id, status }),
+      });
+      toast.push({ variant: 'success', title: 'Status updated', description: `${id} → ${status}` });
+    } catch {
+      toast.push({ variant: 'error', title: 'Could not update status' });
+      fetchBookings();
+    }
+  };
+
+  const statusColor = (s: string) =>
+    s === 'Confirmed' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+    : s === 'Completed' ? 'bg-sky-500/15 text-sky-400 border-sky-500/20'
+    : s === 'Cancelled' ? 'bg-red-500/15 text-red-400 border-red-500/20'
+    : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/20';
+
+  const inputCls = 'w-full px-3 py-2 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-white focus:border-[#FF6B00] focus:outline-none';
+
+  // ── Trainer editor ────────────────────────────────────────────────────
+  const [tEdit, setTEdit] = useState<Trainer | null>(null);
+  const blankTrainer: Trainer = { id: '', name: '', specialty: '', experience: 1, bio: '', image: '', rating: 5, active: true };
+
+  const saveTrainer = () => {
+    if (!tEdit) return;
+    if (!tEdit.name.trim()) { toast.push({ variant: 'error', title: 'Enter trainer name' }); return; }
+    if (tEdit.id) updateTrainer(tEdit.id, tEdit);
+    else addTrainer(tEdit);
+    toast.push({ variant: 'success', title: tEdit.id ? 'Trainer updated' : 'Trainer added' });
+    setTEdit(null);
+  };
+
+  const onTrainerImage = async (file: File | undefined) => {
+    if (!file || !tEdit) return;
+    const url = await fileToDataURL(file);
+    setTEdit({ ...tEdit, image: url });
+  };
+
+  // ── Plan editor ───────────────────────────────────────────────────────
+  const [pEdit, setPEdit] = useState<TrainingPlan | null>(null);
+  const blankPlan: TrainingPlan = { id: '', name: '', tagline: '', price: 0, oldPrice: 0, period: 'per month', features: [], popular: false, active: true };
+
+  const savePlan = () => {
+    if (!pEdit) return;
+    if (!pEdit.name.trim()) { toast.push({ variant: 'error', title: 'Enter plan name' }); return; }
+    if (pEdit.id) updatePlan(pEdit.id, pEdit);
+    else addPlan(pEdit);
+    toast.push({ variant: 'success', title: pEdit.id ? 'Plan updated' : 'Plan added' });
+    setPEdit(null);
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
+      <div>
+        <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white flex items-center gap-2">
+          <Dumbbell size={20} className="text-[#FF6B00]" /> Personal Trainers
+        </h2>
+        <p className="text-[rgba(245,245,245,0.4)] text-sm mt-0.5">Manage trainer profiles, membership plans &amp; pricing, and view slot bookings.</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        {([['bookings', 'Bookings'], ['trainers', 'Trainers'], ['plans', 'Plans & Pricing']] as const).map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${tab === id ? 'bg-[#FF6B00] text-white' : 'bg-[#111] text-[rgba(245,245,245,0.5)] hover:text-white border border-[rgba(255,255,255,0.06)]'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── BOOKINGS ────────────────────────────────────────────────── */}
+      {tab === 'bookings' && (
+        <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden">
+          <div className="px-5 py-3 border-b border-[rgba(255,255,255,0.06)] flex items-center justify-between">
+            <p className="text-[11px] font-bold tracking-widest uppercase text-[rgba(245,245,245,0.4)]">{bookings.length} booking(s)</p>
+            <button onClick={fetchBookings} className="flex items-center gap-1.5 text-[11px] text-[#FF6B00] font-bold hover:underline">
+              <RefreshCw size={12} /> Refresh
+            </button>
+          </div>
+          {bookingsLoading ? (
+            <div className="p-10 text-center"><Loader2 size={20} className="text-[#FF6B00] animate-spin mx-auto" /></div>
+          ) : bookings.length === 0 ? (
+            <div className="p-10 text-center text-[rgba(245,245,245,0.4)] text-sm">No bookings yet.</div>
+          ) : (
+            <div className="divide-y divide-[rgba(255,255,255,0.05)]">
+              {bookings.map(b => (
+                <div key={b.id} className="p-5 flex flex-wrap gap-4 items-start">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-white">{b.customer_name}</p>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColor(b.status)}`}>{b.status}</span>
+                      <span className="text-[10px] font-mono text-[rgba(245,245,245,0.35)]">{b.id}</span>
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[rgba(245,245,245,0.55)]">
+                      <span className="flex items-center gap-1"><Phone size={12} className="text-[#FF6B00]" /> {b.customer_phone}</span>
+                      <span className="flex items-center gap-1"><Mail size={12} className="text-[#FF6B00]" /> {b.customer_email}</span>
+                      {b.trainer_name && <span className="flex items-center gap-1"><Dumbbell size={12} className="text-[#FF6B00]" /> {b.trainer_name}</span>}
+                      {b.plan_name && <span className="flex items-center gap-1"><Tag size={12} className="text-[#FF6B00]" /> {b.plan_name}{b.plan_price ? ` · ₹${Number(b.plan_price).toLocaleString('en-IN')}` : ''}</span>}
+                      {b.preferred_date && <span className="flex items-center gap-1"><Calendar size={12} className="text-[#FF6B00]" /> {b.preferred_date}</span>}
+                      {b.preferred_time && <span className="flex items-center gap-1"><Clock size={12} className="text-[#FF6B00]" /> {b.preferred_time}</span>}
+                    </div>
+                    {b.goal && <p className="mt-1.5 text-[12px] text-[rgba(245,245,245,0.45)] italic">&ldquo;{b.goal}&rdquo;</p>}
+                  </div>
+                  <select value={b.status} onChange={e => setStatus(b.id, e.target.value)}
+                    className="px-3 py-2 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-lg text-xs text-white focus:border-[#FF6B00] focus:outline-none">
+                    {BOOKING_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TRAINERS ────────────────────────────────────────────────── */}
+      {tab === 'trainers' && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <button onClick={() => setTEdit(blankTrainer)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all">
+              <PlusCircle size={15} /> Add trainer
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {trainers.map(t => (
+              <div key={t.id} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden">
+                <div className="aspect-[4/3] bg-[#0a0a0a] relative">
+                  {t.image
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={t.image} alt={t.name} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center text-[rgba(245,245,245,0.2)]"><Users size={36} /></div>}
+                  {!t.active && <span className="absolute top-2 left-2 text-[10px] font-bold bg-black/70 text-red-400 px-2 py-0.5 rounded-full">Hidden</span>}
+                </div>
+                <div className="p-4">
+                  <p className="font-bold text-white text-sm">{t.name}</p>
+                  <p className="text-[12px] text-[#FF6B00] font-semibold">{t.specialty}</p>
+                  <p className="text-[11px] text-[rgba(245,245,245,0.4)] mt-0.5">{t.experience}+ yrs · ⭐ {t.rating.toFixed(1)}</p>
+                  <div className="mt-3 flex gap-2">
+                    <button onClick={() => setTEdit(t)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-[rgba(255,255,255,0.1)] text-white text-xs font-bold rounded-lg hover:border-[#FF6B00] transition-all"><Edit2 size={12} /> Edit</button>
+                    <button onClick={() => { if (confirm(`Delete ${t.name}?`)) deleteTrainer(t.id); }} className="p-2 text-[rgba(245,245,245,0.3)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── PLANS ───────────────────────────────────────────────────── */}
+      {tab === 'plans' && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <button onClick={() => setPEdit(blankPlan)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all">
+              <PlusCircle size={15} /> Add plan
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {plans.map(p => (
+              <div key={p.id} className={`bg-[#111] rounded-2xl border p-4 ${p.popular ? 'border-[#FF6B00]' : 'border-[rgba(255,255,255,0.06)]'}`}>
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-white text-sm">{p.name}</p>
+                  {p.popular && <span className="text-[9px] font-bold text-[#FF6B00] bg-[#FF6B00]/10 px-1.5 py-0.5 rounded-full">POPULAR</span>}
+                </div>
+                <p className="text-[12px] text-[rgba(245,245,245,0.5)] mt-0.5">{p.tagline}</p>
+                <div className="mt-2 flex items-end gap-2">
+                  <span className="text-lg font-black text-white">₹{p.price.toLocaleString('en-IN')}</span>
+                  {p.oldPrice > 0 && <span className="text-xs text-[rgba(245,245,245,0.35)] line-through mb-0.5">₹{p.oldPrice.toLocaleString('en-IN')}</span>}
+                  <span className="text-[11px] text-[rgba(245,245,245,0.4)] mb-0.5">{p.period}</span>
+                </div>
+                <p className="text-[11px] text-[rgba(245,245,245,0.4)] mt-1">{p.features.length} feature(s){p.active ? '' : ' · hidden'}</p>
+                <div className="mt-3 flex gap-2">
+                  <button onClick={() => setPEdit(p)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-[rgba(255,255,255,0.1)] text-white text-xs font-bold rounded-lg hover:border-[#FF6B00] transition-all"><Edit2 size={12} /> Edit</button>
+                  <button onClick={() => { if (confirm(`Delete ${p.name}?`)) deletePlan(p.id); }} className="p-2 text-[rgba(245,245,245,0.3)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Trainer editor modal ────────────────────────────────────── */}
+      <AnimatePresence>
+        {tEdit && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setTEdit(null)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.1)] w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-white">{tEdit.id ? 'Edit trainer' : 'Add trainer'}</h3>
+                <button onClick={() => setTEdit(null)} className="p-1 text-[rgba(245,245,245,0.4)] hover:text-white"><X size={18} /></button>
+              </div>
+              <input className={inputCls} placeholder="Name" value={tEdit.name} onChange={e => setTEdit({ ...tEdit, name: e.target.value })} />
+              <input className={inputCls} placeholder="Specialty (e.g. Strength & Conditioning)" value={tEdit.specialty} onChange={e => setTEdit({ ...tEdit, specialty: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <input className={inputCls} type="number" placeholder="Experience (yrs)" value={tEdit.experience} onChange={e => setTEdit({ ...tEdit, experience: Number(e.target.value) })} />
+                <input className={inputCls} type="number" step="0.1" min="0" max="5" placeholder="Rating" value={tEdit.rating} onChange={e => setTEdit({ ...tEdit, rating: Number(e.target.value) })} />
+              </div>
+              <textarea className={inputCls + ' resize-none'} rows={3} placeholder="Short bio" value={tEdit.bio} onChange={e => setTEdit({ ...tEdit, bio: e.target.value })} />
+              <input className={inputCls} placeholder="Image URL (or upload below)" value={tEdit.image} onChange={e => setTEdit({ ...tEdit, image: e.target.value })} />
+              <label className="flex items-center gap-2 text-xs text-[rgba(245,245,245,0.5)] cursor-pointer">
+                <Upload size={14} /> Upload image
+                <input type="file" accept="image/*" className="hidden" onChange={e => onTrainerImage(e.target.files?.[0])} />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                <input type="checkbox" checked={tEdit.active} onChange={e => setTEdit({ ...tEdit, active: e.target.checked })} /> Visible on site
+              </label>
+              <button onClick={saveTrainer} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all">
+                <Save size={14} /> Save trainer
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Plan editor modal ───────────────────────────────────────── */}
+      <AnimatePresence>
+        {pEdit && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPEdit(null)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.1)] w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-white">{pEdit.id ? 'Edit plan' : 'Add plan'}</h3>
+                <button onClick={() => setPEdit(null)} className="p-1 text-[rgba(245,245,245,0.4)] hover:text-white"><X size={18} /></button>
+              </div>
+              <input className={inputCls} placeholder="Plan name" value={pEdit.name} onChange={e => setPEdit({ ...pEdit, name: e.target.value })} />
+              <input className={inputCls} placeholder="Tagline" value={pEdit.tagline} onChange={e => setPEdit({ ...pEdit, tagline: e.target.value })} />
+              <div className="grid grid-cols-3 gap-3">
+                <input className={inputCls} type="number" placeholder="Price ₹" value={pEdit.price} onChange={e => setPEdit({ ...pEdit, price: Number(e.target.value) })} />
+                <input className={inputCls} type="number" placeholder="Old price ₹" value={pEdit.oldPrice} onChange={e => setPEdit({ ...pEdit, oldPrice: Number(e.target.value) })} />
+                <input className={inputCls} placeholder="Period" value={pEdit.period} onChange={e => setPEdit({ ...pEdit, period: e.target.value })} />
+              </div>
+              <textarea className={inputCls + ' resize-none'} rows={5} placeholder="Features — one per line"
+                value={pEdit.features.join('\n')} onChange={e => setPEdit({ ...pEdit, features: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })} />
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                  <input type="checkbox" checked={pEdit.popular} onChange={e => setPEdit({ ...pEdit, popular: e.target.checked })} /> Most popular
+                </label>
+                <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                  <input type="checkbox" checked={pEdit.active} onChange={e => setPEdit({ ...pEdit, active: e.target.checked })} /> Visible on site
+                </label>
+              </div>
+              <button onClick={savePlan} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all">
+                <Save size={14} /> Save plan
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -1913,6 +2225,9 @@ function AdminDashboard() {
 
           {/* ADMINS (owner only) */}
           {activeSection === 'admins' && owner && <AdminsSection />}
+
+          {/* PERSONAL TRAINERS */}
+          {activeSection === 'trainers' && <TrainersSection />}
 
           {/* SETTINGS */}
           {activeSection === 'settings' && (

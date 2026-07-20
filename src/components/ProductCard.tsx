@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Star, ShoppingCart, Heart, Check, Clock } from 'lucide-react';
 import { Product } from '@/lib/data';
+import { isWished, toggleWishlist, onStoreChange } from '@/lib/store';
 import { useCart } from './CartProvider';
 import { useToast } from './ToastProvider';
 
@@ -27,6 +28,11 @@ export default function ProductCard({ product: p, index = 0 }: ProductCardProps)
   const [added, setAdded] = useState(false);
   const [wished, setWished] = useState(false);
 
+  useEffect(() => {
+    setWished(isWished(p.id));
+    return onStoreChange(() => setWished(isWished(p.id)));
+  }, [p.id]);
+
   const handleAdd = () => {
     addItem({ id: p.id, name: p.name, brand: p.brand, price: p.price, originalPrice: p.originalPrice, image: p.image });
     setAdded(true);
@@ -39,15 +45,13 @@ export default function ProductCard({ product: p, index = 0 }: ProductCardProps)
   };
 
   const handleWish = () => {
-    setWished(w => {
-      const next = !w;
-      push({
-        title: next ? 'Saved to wishlist' : 'Removed from wishlist',
-        description: p.name,
-        variant: next ? 'success' : 'info',
-        durationMs: 2000,
-      });
-      return next;
+    const next = toggleWishlist(p.id);
+    setWished(next);
+    push({
+      title: next ? 'Saved to wishlist' : 'Removed from wishlist',
+      description: p.name,
+      variant: next ? 'success' : 'info',
+      durationMs: 2000,
     });
   };
 

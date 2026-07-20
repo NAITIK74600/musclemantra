@@ -1,13 +1,11 @@
-import ComingSoon from '@/components/ComingSoon';
+import type { Metadata } from 'next';
+import WishlistClient from './WishlistClient';
 
-export const metadata = { title: 'Wishlist — Muscle Mantra' };
+export const metadata: Metadata = {
+  title: 'Wishlist — Muscle Mantra',
+  description: 'Your saved supplements. Keep track of your favourite protein, creatine, pre-workout and more at Muscle Mantra.',
+};
 
 export default function WishlistPage() {
-  return (
-    <ComingSoon
-      eyebrow="Your Wishlist"
-      title="Save Your Favourites"
-      description="A dedicated wishlist to save and revisit your favourite supplements is on the way. For now, keep exploring the shop."
-    />
-  );
+  return <WishlistClient />;
 }
