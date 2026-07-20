@@ -2983,11 +2983,11 @@ function AdminDashboard() {
           <motion.div
             key="product-modal"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div
               initial={{ y: 20, scale: 0.98, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: 10, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-              className="w-full max-w-4xl my-8 bg-[#0d0d0d] border border-[rgba(255,255,255,0.08)] rounded-2xl overflow-hidden">
+              className="w-full max-w-4xl max-h-[90vh] bg-[#0d0d0d] border border-[rgba(255,255,255,0.08)] rounded-2xl overflow-y-auto overflow-x-hidden overscroll-contain">
               <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.06)] bg-[#0d0d0d]">
                 <div>
                   <h3 className="font-[var(--font-montserrat)] font-black text-lg text-white">
