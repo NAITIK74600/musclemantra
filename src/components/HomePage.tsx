@@ -16,10 +16,6 @@ import {
 import ProductCard from './ProductCard';
 import { useToast } from './ToastProvider';
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   SHARED DESIGN PRIMITIVES
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-
 /** Consistent reveal-on-scroll wrapper.
  *  SEO-safe: server-rendered as plain visible <div>. Animation only runs
  *  after client mount to keep initial HTML free of opacity:0 styles that
@@ -158,7 +154,6 @@ function HeroSection() {
               </span>
             </ClientMotion>
 
-            {/* Subcopy — clearly explains the app's purpose for OAuth verification */}
             <ClientMotion as="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
               className="text-white/70 text-[14.5px] sm:text-base md:text-lg mb-6 sm:mb-7 leading-relaxed max-w-lg">
               <strong className="text-white/90 font-semibold">Muscle Mantra</strong> is an online supplement e-commerce store based in India. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA — sourced directly from official brands, with unbeatable prices and fast doorstep delivery across India.
@@ -228,10 +223,6 @@ function TrustStrip() {
     </section>
   );
 }
-
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   CATEGORIES
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const catImages = [
   'https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=300&q=75',
   'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&q=75',
@@ -373,9 +364,6 @@ function FlashDealsSection() {
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   BESTSELLERS
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function BestsellersSection() {
   const [prods, setProds] = useState<AdminProduct[]>(defaultAdminProducts);
   useEffect(() => {
