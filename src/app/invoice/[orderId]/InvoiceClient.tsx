@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Printer, ArrowLeft, Package, Download, Loader2 } from 'lucide-react';
+import { Printer, ArrowLeft, Package, Download, Loader2, CheckCircle2 } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -39,6 +39,35 @@ interface Order {
 
 function formatINR(n: number) {
   return '₹' + n.toLocaleString('en-IN');
+}
+
+const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+function twoDigitWords(n: number): string {
+  if (n < 20) return ONES[n];
+  const t = Math.floor(n / 10), o = n % 10;
+  return TENS[t] + (o ? ' ' + ONES[o] : '');
+}
+function threeDigitWords(n: number): string {
+  const h = Math.floor(n / 100), r = n % 100;
+  return (h ? ONES[h] + ' Hundred' + (r ? ' ' : '') : '') + (r ? twoDigitWords(r) : '');
+}
+/** Indian-numbering (lakh/crore) amount-in-words, e.g. "One Thousand Two Hundred Twenty One Rupees Only". */
+function numberToWordsINR(amount: number): string {
+  let num = Math.round(amount);
+  if (num <= 0) return 'Zero Rupees Only';
+  const crore = Math.floor(num / 10000000); num %= 10000000;
+  const lakh = Math.floor(num / 100000); num %= 100000;
+  const thousand = Math.floor(num / 1000); num %= 1000;
+  const hundred = num;
+  const parts: string[] = [];
+  if (crore) parts.push(threeDigitWords(crore) + ' Crore');
+  if (lakh) parts.push(threeDigitWords(lakh) + ' Lakh');
+  if (thousand) parts.push(threeDigitWords(thousand) + ' Thousand');
+  if (hundred) parts.push(threeDigitWords(hundred));
+  return parts.join(' ') + ' Rupees Only';
 }
 
 const PM_LABELS: Record<string, string> = {
@@ -86,6 +115,29 @@ export default function InvoiceClient() {
   const [order, setOrder] = useState<Order | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [payQrDataUrl, setPayQrDataUrl] = useState<string | null>(null);
+
+  // Lazy-load the QR code generator from a CDN (same pattern as the jsPDF
+  // loader below) — keeps the bundle small since not every invoice view
+  // needs it (paid orders skip the "Scan & Pay" QR entirely).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- CDN lib has no bundled types here.
+  const loadQRCodeLib = (): Promise<any> => new Promise((resolve, reject) => {
+    const w = window as unknown as { QRCode?: unknown };
+    if (w.QRCode) { resolve(w.QRCode); return; }
+    const existing = document.getElementById('qrcode-cdn') as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener('load', () => resolve((window as unknown as { QRCode: unknown }).QRCode));
+      existing.addEventListener('error', reject);
+      return;
+    }
+    const s = document.createElement('script');
+    s.id = 'qrcode-cdn';
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js';
+    s.async = true;
+    s.onload = () => resolve((window as unknown as { QRCode: unknown }).QRCode);
+    s.onerror = reject;
+    document.body.appendChild(s);
+  });
 
   useEffect(() => {
     // Resolve the real order id. Static export serves the "_" placeholder page
@@ -120,6 +172,20 @@ export default function InvoiceClient() {
     load();
   }, [params]);
 
+  // Generate a "Scan & Pay via PayU" QR (points at our own /pay page, which
+  // fetches a fresh server-signed PayU hash for this exact order — never a
+  // raw static UPI code) once the order is known and still unpaid.
+  useEffect(() => {
+    if (!order || order.status === 'Payment Received' || typeof window === 'undefined') return;
+    let cancelled = false;
+    const payUrl = `${window.location.origin}/pay?order=${encodeURIComponent(order.id)}`;
+    loadQRCodeLib()
+      .then((QRCode) => QRCode.toDataURL(payUrl, { margin: 1, width: 200, color: { dark: '#111111', light: '#ffffff' } }))
+      .then((url: string) => { if (!cancelled) setPayQrDataUrl(url); })
+      .catch(() => { /* QR is a nice-to-have — the Pay Now link still works without it */ });
+    return () => { cancelled = true; };
+  }, [order]);
+
   if (notFound) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4">
@@ -146,6 +212,8 @@ export default function InvoiceClient() {
   const date = dateObj && !isNaN(dateObj.getTime())
     ? dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
     : '—';
+  const isPaid = order.status === 'Payment Received';
+  const payUrl = typeof window !== 'undefined' ? `${window.location.origin}/pay?order=${encodeURIComponent(order.id)}` : '';
 
   // Lazy-load jsPDF from CDN and build a clean, text-based invoice PDF.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsPDF is loaded from a CDN and has no bundled types here.
@@ -257,7 +325,49 @@ export default function InvoiceClient() {
       totRow('Shipping', order.shipping ? rupee(order.shipping) : 'FREE');
       totRow('Grand Total', rupee(order.total), true);
 
-      y += 10;
+      y += 4;
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor('#666');
+      const wordsLines = doc.splitTextToSize(`Amount in words: ${numberToWordsINR(order.total)}`, W - 2 * M);
+      doc.text(wordsLines, M, y);
+      y += wordsLines.length * 11 + 14;
+
+      // Payment status / Scan & Pay via PayU
+      if (isPaid) {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor('#16a34a');
+        doc.text(`Payment Received \u00b7 ${PM_LABELS[order.paymentMethod] ?? order.paymentMethod ?? 'Online'}`, M, y);
+        y += 20;
+      } else {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor('#111');
+        doc.text('Scan & Pay via PayU', M, y);
+        y += 6;
+        try {
+          const QRCode = await loadQRCodeLib();
+          const qrDataUrl: string = payQrDataUrl ?? await QRCode.toDataURL(payUrl, { margin: 1, width: 200 });
+          doc.addImage(qrDataUrl, 'PNG', M, y, 66, 66);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor('#666');
+          const payLines = doc.splitTextToSize(
+            `Scan with any camera / UPI app to pay ${rupee(order.total)} securely via PayU, or open:\n${payUrl}`,
+            W - 2 * M - 82
+          );
+          doc.text(payLines, M + 78, y + 10);
+          y += 76;
+        } catch {
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor('#666');
+          doc.text(`Pay online via PayU: ${payUrl}`, M, y);
+          y += 20;
+        }
+      }
+
+      // Signature
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(11); doc.setTextColor('#333');
+      doc.text('Muscle Mantra', W - M, y, { align: 'right' });
+      y += 4;
+      doc.setDrawColor('#ccc'); doc.line(W - M - 110, y, W - M, y);
+      y += 11;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor('#999');
+      doc.text('Authorized Signatory', W - M, y, { align: 'right' });
+
+      y += 20;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor('#999');
       doc.text('Thank you for shopping with Muscle Mantra! For help, reply to your order email.', M, y);
 
@@ -314,10 +424,25 @@ export default function InvoiceClient() {
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <div className="text-[10px] font-bold tracking-[2px] uppercase text-[rgba(245,245,245,0.35)] print:text-gray-400">Tax Invoice</div>
-                <div className="font-[var(--font-montserrat)] font-black text-sm sm:text-2xl text-white print:text-black mt-1 break-all">#{order.id}</div>
-                <div className="text-[11px] sm:text-xs text-[rgba(245,245,245,0.45)] mt-1 print:text-gray-500 whitespace-nowrap">{date}</div>
+                <div className="text-[12px] sm:text-sm font-black tracking-[2px] uppercase text-white print:text-black">Tax Invoice</div>
+                <div className="inline-block mt-1.5 text-[8px] sm:text-[9px] font-bold tracking-wider uppercase text-[rgba(245,245,245,0.4)] border border-[rgba(255,255,255,0.15)] rounded px-1.5 py-0.5 print:text-gray-500 print:border-gray-300">Original for Buyer</div>
               </div>
+            </div>
+          </div>
+
+          {/* Invoice meta */}
+          <div className="px-6 sm:px-9 py-4 grid grid-cols-3 gap-3 border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] print:bg-gray-50 print:border-gray-200">
+            <div className="min-w-0">
+              <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-[rgba(245,245,245,0.35)] print:text-gray-400">Invoice No.</div>
+              <div className="text-[12px] sm:text-sm font-bold text-white print:text-black break-all">{order.id}</div>
+            </div>
+            <div className="min-w-0">
+              <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-[rgba(245,245,245,0.35)] print:text-gray-400">Invoice Date</div>
+              <div className="text-[12px] sm:text-sm font-bold text-white print:text-black">{date}</div>
+            </div>
+            <div className="min-w-0">
+              <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-[rgba(245,245,245,0.35)] print:text-gray-400">Payment Status</div>
+              <div className={`text-[12px] sm:text-sm font-black ${isPaid ? 'text-green-400' : 'text-[#FF6B00]'}`}>{isPaid ? 'Paid' : 'Unpaid'}</div>
             </div>
           </div>
 
@@ -348,7 +473,7 @@ export default function InvoiceClient() {
                 <tr className="bg-[#1a1a1a] print:bg-gray-100">
                   <th className="py-2.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-left print:text-gray-500">Item</th>
                   <th className="py-2.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-center print:text-gray-500">Qty</th>
-                  <th className="py-2.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-right print:text-gray-500">Unit</th>
+                  <th className="py-2.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-right print:text-gray-500">Rate</th>
                   <th className="py-2.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-right print:text-gray-500">Amount</th>
                 </tr>
               </thead>
@@ -364,9 +489,43 @@ export default function InvoiceClient() {
               </tbody>
             </table>
 
-            {/* Totals */}
-            <div className="mt-5 flex justify-end">
-              <div className="w-64 space-y-2">
+            {/* Payment (Scan & Pay via PayU) + Totals */}
+            <div className="mt-5 grid sm:grid-cols-2 gap-6 items-start">
+              {/* Left: payment status / Scan & Pay QR */}
+              <div className="min-w-0">
+                {isPaid ? (
+                  <div className="inline-flex items-center gap-2 bg-[rgba(34,197,94,0.1)] border border-[rgba(34,197,94,0.25)] text-green-400 text-[13px] font-bold px-4 py-3 rounded-xl print:bg-green-50 print:border-green-200 print:text-green-700">
+                    <CheckCircle2 size={16} className="shrink-0" />
+                    Payment Received via {PM_LABELS[order.paymentMethod] ?? order.paymentMethod}
+                  </div>
+                ) : (
+                  <div className="bg-[#0d0d0d] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 print:bg-gray-50 print:border-gray-200">
+                    <div className="text-[10px] font-bold tracking-[1.5px] uppercase text-[#FF6B00] mb-3">Scan &amp; Pay via PayU</div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 h-24 bg-white rounded-lg p-1.5 shrink-0 flex items-center justify-center overflow-hidden">
+                        {payQrDataUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={payQrDataUrl} alt="Scan to pay via PayU" className="w-full h-full" />
+                        ) : (
+                          <div className="w-full h-full rounded bg-gray-200 animate-pulse" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] text-[rgba(245,245,245,0.5)] leading-snug print:text-gray-500">
+                          Scan with your phone camera to pay {formatINR(order.total)} securely via PayU.
+                        </p>
+                        <a href={payUrl} target="_blank" rel="noreferrer"
+                          className="print:hidden mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-[#FF6B00] hover:underline">
+                          Or pay now via PayU →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right: totals */}
+              <div className="w-full sm:w-64 sm:ml-auto space-y-2">
                 <div className="flex justify-between text-sm text-[rgba(245,245,245,0.55)] print:text-gray-500">
                   <span>Subtotal</span><span>{formatINR(subtotal)}</span>
                 </div>
@@ -388,18 +547,14 @@ export default function InvoiceClient() {
                   <span className="font-[var(--font-montserrat)] font-black text-base text-white print:text-black">Total</span>
                   <span className="font-[var(--font-montserrat)] font-black text-xl text-[#FF6B00]">{formatINR(order.total)}</span>
                 </div>
+                <p className="text-[10px] italic text-[rgba(245,245,245,0.35)] pt-1 print:text-gray-400">
+                  {numberToWordsINR(order.total)}
+                </p>
+                <div className="pt-8 text-right">
+                  <div className="italic text-[15px] text-[rgba(245,245,245,0.6)] print:text-gray-600" style={{ fontFamily: 'Georgia, serif' }}>Muscle Mantra</div>
+                  <div className="text-[9px] text-[rgba(245,245,245,0.3)] mt-1 pt-1.5 border-t border-[rgba(255,255,255,0.12)] print:text-gray-400 print:border-gray-300">Authorized Signatory</div>
+                </div>
               </div>
-            </div>
-
-            {/* Payment badge */}
-            <div className="mt-6 inline-flex flex-wrap items-center gap-x-2 gap-y-1.5 bg-[#1a1a1a] border border-[rgba(255,255,255,0.06)] rounded-xl px-4 py-3 print:bg-gray-50 print:border-gray-200">
-              <span className="text-[11px] text-[rgba(245,245,245,0.4)] uppercase tracking-wider print:text-gray-400">Payment</span>
-              <span className="text-sm font-bold text-white print:text-black">{PM_LABELS[order.paymentMethod] ?? order.paymentMethod}</span>
-              <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                order.status.toLowerCase().includes('confirm') || order.status.toLowerCase().includes('paid')
-                  ? 'bg-[rgba(34,197,94,0.12)] text-green-400 border border-[rgba(34,197,94,0.2)]'
-                  : 'bg-[rgba(255,107,0,0.1)] text-[#FF6B00] border border-[rgba(255,107,0,0.2)]'
-              }`}>{order.status}</span>
             </div>
           </div>
 
