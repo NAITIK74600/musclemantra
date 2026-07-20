@@ -631,7 +631,7 @@ export default function CheckoutClient() {
                     className="overflow-hidden"
                   >
                     <div className="p-3.5 rounded-xl bg-[rgba(255,107,0,0.06)] border border-[rgba(255,107,0,0.15)] text-[12px] text-[rgba(245,245,245,0.6)]">
-                      <span className="font-bold text-[#FF6B00]">Secured by PayU</span> — you will be redirected to PayU's secure payment page to complete your payment. All major UPI apps, cards &amp; net banking supported.
+                      <span className="font-bold text-[#FF6B00]">Secured by PayU</span> — you will be redirected to PayU&apos;s secure payment page to complete your payment. All major UPI apps, cards &amp; net banking supported.
                     </div>
                   </motion.div>
                 )}

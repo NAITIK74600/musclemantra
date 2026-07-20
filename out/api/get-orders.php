@@ -3,9 +3,22 @@ require_once __DIR__ . "/db.php";
 apiInit(["GET"]);
 $db = getDB();
 
-// Admin: return all orders
+// Admin: return all orders. Accept either the shared admin key (legacy) OR a
+// logged-in admin's bearer session token (preferred — no static key in the client).
+$isAdmin  = false;
 $adminKey = $_SERVER["HTTP_X_ADMIN_KEY"] ?? "";
-if ($adminKey && hash_equals(ADMIN_KEY, $adminKey)) {
+if ($adminKey !== "" && ADMIN_KEY !== "" && hash_equals(ADMIN_KEY, $adminKey)) {
+    $isAdmin = true;
+} else {
+    $bt = bearerToken();
+    if ($bt) {
+        $sa = $db->prepare("SELECT u.is_admin FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ? AND s.expires_at > NOW() LIMIT 1");
+        $sa->execute([$bt]);
+        $au = $sa->fetch();
+        if ($au && (int)($au["is_admin"] ?? 0) === 1) $isAdmin = true;
+    }
+}
+if ($isAdmin) {
     $limit  = min((int)($_GET["limit"]  ?? 100), 500);
     $offset = (int)($_GET["offset"] ?? 0);
     $st = $db->prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT ? OFFSET ?");

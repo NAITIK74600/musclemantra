@@ -148,6 +148,7 @@ export default function InvoiceClient() {
     : '—';
 
   // Lazy-load jsPDF from CDN and build a clean, text-based invoice PDF.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsPDF is loaded from a CDN and has no bundled types here.
   const loadJsPDF = (): Promise<any> => new Promise((resolve, reject) => {
     const w = window as unknown as { jspdf?: { jsPDF: unknown } };
     if (w.jspdf?.jsPDF) { resolve(w.jspdf.jsPDF); return; }

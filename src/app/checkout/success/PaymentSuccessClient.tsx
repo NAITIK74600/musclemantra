@@ -78,7 +78,7 @@ export default function PaymentSuccessClient() {
       {/* Trust note */}
       <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[rgba(34,197,94,0.07)] border border-[rgba(34,197,94,0.15)] mb-8 text-sm text-green-400 font-medium">
         <CheckCircle size={14} />
-        Payment secured by PayU — India's trusted payment gateway
+        Payment secured by PayU — India&apos;s trusted payment gateway
       </div>
 
       <div className="flex gap-3 flex-wrap justify-center">

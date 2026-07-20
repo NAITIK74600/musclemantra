@@ -31,8 +31,18 @@ import { useToast } from '@/components/ToastProvider';
 import AdminGate from '@/components/AdminGate';
 import {
   signOutAdmin, getAdminEmail, changeAdminPassword, isAdminOwner,
-  listAdmins, appointAdmin, revokeAdmin, type AdminUser,
+  listAdmins, appointAdmin, revokeAdmin, getAdminToken, type AdminUser,
 } from '@/lib/adminAuth';
+
+/** Admin API auth headers — carries the logged-in admin's bearer session token.
+ *  No static admin key is shipped to the browser; the server verifies the session. */
+function authHeaders(json = true): Record<string, string> {
+  const h: Record<string, string> = {};
+  if (json) h['Content-Type'] = 'application/json';
+  const t = getAdminToken();
+  if (t) h['Authorization'] = `Bearer ${t}`;
+  return h;
+}
 
 const sidebarItems = [
   { id: 'dashboard',     icon: LayoutDashboard,  label: 'Dashboard' },
@@ -333,7 +343,6 @@ const BOOKING_STATUSES = ['Pending', 'Confirmed', 'Completed', 'Cancelled'];
 
 function TrainersSection() {
   const toast = useToast();
-  const ADMIN_KEY_VAL = process.env.NEXT_PUBLIC_ADMIN_SETUP_KEY ?? '';
 
   const [tab, setTab] = useState<'bookings' | 'trainers' | 'plans'>('bookings');
   const [trainers, setTrainers] = useState<Trainer[]>([]);
@@ -351,14 +360,14 @@ function TrainersSection() {
   const fetchBookings = useCallback(async () => {
     setBookingsLoading(true);
     try {
-      const res = await fetch('/api/book-trainer', { headers: { 'x-admin-key': ADMIN_KEY_VAL } });
+      const res = await fetch('/api/book-trainer', { headers: authHeaders(false) });
       if (res.ok) {
         const data = await res.json();
         setBookings(Array.isArray(data.bookings) ? data.bookings : []);
       }
     } catch { /* ignore */ }
     finally { setBookingsLoading(false); }
-  }, [ADMIN_KEY_VAL]);
+  }, []);
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
@@ -367,7 +376,7 @@ function TrainersSection() {
     try {
       await fetch('/api/book-trainer', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
+        headers: authHeaders(),
         body: JSON.stringify({ id, status }),
       });
       toast.push({ variant: 'success', title: 'Status updated', description: `${id} → ${status}` });
@@ -644,8 +653,6 @@ function AdminDashboard() {
   const flip = (k: keyof typeof toggles) => setToggles(t => ({ ...t, [k]: !t[k] }));
 
   // ── Orders (fetched from server) ─────────────────────────────────────────
-  const ADMIN_KEY_VAL = process.env.NEXT_PUBLIC_ADMIN_SETUP_KEY ?? '';
-
   interface AdminOrder {
     id: string;
     items: { name: string; price: number; quantity: number }[];
@@ -665,7 +672,7 @@ function AdminDashboard() {
     setOrdersLoading(true);
     try {
       const res = await fetch('/api/get-orders', {
-        headers: { 'x-admin-key': ADMIN_KEY_VAL },
+        headers: authHeaders(false),
       });
       if (res.ok) {
         const data = await res.json();
@@ -696,7 +703,7 @@ function AdminDashboard() {
       }
     } catch { /* silent */ }
     setOrdersLoading(false);
-  }, [ADMIN_KEY_VAL]);
+  }, []);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -783,7 +790,7 @@ function AdminDashboard() {
     try {
       const res = await fetch('/api/update-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
+        headers: authHeaders(),
         body: JSON.stringify({ id, status }),
       });
       const data = await res.json().catch(() => ({} as { error?: string }));
@@ -798,14 +805,14 @@ function AdminDashboard() {
       toast.push({ variant: 'error', title: 'Network error', description: 'Could not reach the server. Please retry.' });
       fetchOrders();
     }
-  }, [ADMIN_KEY_VAL, orderList, toast, fetchOrders]);
+  }, [orderList, toast, fetchOrders]);
 
   const resendOrderEmail = useCallback(async (id: string) => {
     toast.push({ variant: 'info', title: `Resending email for #${id}…` });
     try {
       const res = await fetch('/api/resend-order-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
+        headers: authHeaders(),
         body: JSON.stringify({ id }),
       });
       const data = await res.json().catch(() => ({}));
@@ -817,14 +824,14 @@ function AdminDashboard() {
     } catch {
       toast.push({ variant: 'error', title: 'Network error while resending' });
     }
-  }, [ADMIN_KEY_VAL, toast]);
+  }, [toast]);
 
   const deleteOrder = useCallback(async (id: string) => {
     if (!confirm(`Delete order #${id}? This permanently removes it.`)) return;
     try {
       const res = await fetch('/api/delete-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
+        headers: authHeaders(),
         body: JSON.stringify({ id }),
       });
       if (res.ok) {
@@ -836,7 +843,7 @@ function AdminDashboard() {
     } catch {
       toast.push({ variant: 'error', title: 'Network error while deleting' });
     }
-  }, [ADMIN_KEY_VAL, toast]);
+  }, [toast]);
 
   const sendTicketReply = () => {
     if (!replyTicket) return;

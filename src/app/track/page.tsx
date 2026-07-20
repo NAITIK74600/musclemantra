@@ -1,4 +1,7 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any -- Leaflet is loaded from a
+   CDN at runtime (static export) and ships no bundled types, so its map/marker
+   instances are necessarily untyped here. */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -61,6 +64,41 @@ function loadLeaflet(): Promise<any> {
   });
 }
 
+/** Great-circle distance in km — fallback ETA when routing is unavailable. */
+function haversineKm(a: [number, number], b: [number, number]): number {
+  const R = 6371;
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+  const dLng = ((b[1] - a[1]) * Math.PI) / 180;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a[0] * Math.PI) / 180) * Math.cos((b[0] * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+/** Glide a Leaflet marker from → to over `duration` ms so the rider never jumps. */
+function animateMarker(
+  marker: any,
+  from: [number, number],
+  to: [number, number],
+  duration: number,
+  animRef: { current: number | null },
+  onFrame: (p: [number, number]) => void,
+) {
+  if (animRef.current != null) cancelAnimationFrame(animRef.current);
+  const start = performance.now();
+  const step = (now: number) => {
+    const t = Math.min(1, (now - start) / duration);
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; // easeInOutQuad
+    const lat = from[0] + (to[0] - from[0]) * e;
+    const lng = from[1] + (to[1] - from[1]) * e;
+    marker.setLatLng([lat, lng]);
+    onFrame([lat, lng]);
+    if (t < 1) animRef.current = requestAnimationFrame(step);
+    else animRef.current = null;
+  };
+  animRef.current = requestAnimationFrame(step);
+}
+
 export default function TrackPage() {
   const [id, setId] = useState('');
   const [phone, setPhone] = useState('');
@@ -68,12 +106,18 @@ export default function TrackPage() {
   const [data, setData] = useState<Track | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [eta, setEta] = useState<{ km: number; mins: number } | null>(null);
 
   const mapRef = useRef<HTMLDivElement | null>(null);
   const leafletRef = useRef<any>(null);
   const riderMarkerRef = useRef<any>(null);
   const destMarkerRef = useRef<any>(null);
+  const routeLineRef = useRef<any>(null);
   const destGeocodedRef = useRef(false);
+  const destCoordsRef = useRef<[number, number] | null>(null);
+  const riderPosRef = useRef<[number, number] | null>(null);
+  const animRef = useRef<number | null>(null);
+  const routeAtRef = useRef(0);
 
   // Prefill from ?id= & ?phone= in the URL (e.g. from the tracking email link).
   useEffect(() => {
@@ -100,16 +144,19 @@ export default function TrackPage() {
     }
   }, [id, phone]);
 
-  // Poll every 10s while tracking.
+  // Poll every 5s while tracking (feels live, like a quick-commerce app).
   useEffect(() => {
     if (!submitted) return;
     setLoading(true);
     fetchTrack();
-    const t = setInterval(fetchTrack, 10000);
+    const t = setInterval(fetchTrack, 5000);
     return () => clearInterval(t);
   }, [submitted, fetchTrack]);
 
-  // Draw / move the rider on the map.
+  // Stop any in-flight marker animation when the page unmounts.
+  useEffect(() => () => { if (animRef.current != null) cancelAnimationFrame(animRef.current); }, []);
+
+  // Draw / move the rider on the map (smooth, Blinkit-style with live route + ETA).
   useEffect(() => {
     if (!submitted || !data || data.lat == null || data.lng == null) return;
     let cancelled = false;
@@ -117,28 +164,39 @@ export default function TrackPage() {
       try {
         const L = await loadLeaflet();
         if (cancelled || !mapRef.current) return;
+        const target: [number, number] = [data.lat!, data.lng!];
 
         if (!leafletRef.current) {
-          leafletRef.current = L.map(mapRef.current, { zoomControl: true, attributionControl: false })
-            .setView([data.lat, data.lng], 15);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 })
-            .addTo(leafletRef.current);
+          leafletRef.current = L.map(mapRef.current, { zoomControl: false, attributionControl: false })
+            .setView(target, 15);
+          // Dark, clean tiles that match the app theme.
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 20, subdomains: 'abcd',
+          }).addTo(leafletRef.current);
         }
         const map = leafletRef.current;
 
         const riderIcon = L.divIcon({
           className: '',
-          html: `<div style="background:${ORANGE};width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 6px rgba(255,107,0,0.25),0 4px 12px rgba(0,0,0,0.4)"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5v8h1"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></div>`,
-          iconSize: [34, 34],
-          iconAnchor: [17, 17],
+          html: `<div style="position:relative;width:38px;height:38px">
+            <div class="mb-rider-pulse"></div>
+            <div style="position:absolute;inset:0;background:${ORANGE};border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(255,107,0,0.25),0 4px 14px rgba(0,0,0,0.5)">
+              <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5v8h1"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+            </div>
+          </div>`,
+          iconSize: [38, 38],
+          iconAnchor: [19, 19],
         });
 
         if (!riderMarkerRef.current) {
-          riderMarkerRef.current = L.marker([data.lat, data.lng], { icon: riderIcon }).addTo(map);
+          riderMarkerRef.current = L.marker(target, { icon: riderIcon, zIndexOffset: 1000 }).addTo(map);
+          riderPosRef.current = target;
         } else {
-          riderMarkerRef.current.setLatLng([data.lat, data.lng]);
+          animateMarker(riderMarkerRef.current, riderPosRef.current || target, target, 900, animRef, (p) => {
+            riderPosRef.current = p;
+          });
         }
-        map.panTo([data.lat, data.lng], { animate: true });
+        map.panTo(target, { animate: true, duration: 0.9 });
 
         // Geocode the destination once and drop a pin.
         if (!destGeocodedRef.current && data.destination) {
@@ -152,18 +210,45 @@ export default function TrackPage() {
             if (!cancelled && Array.isArray(arr) && arr[0]) {
               const dlat = parseFloat(arr[0].lat);
               const dlng = parseFloat(arr[0].lon);
+              destCoordsRef.current = [dlat, dlng];
               const destIcon = L.divIcon({
                 className: '',
-                html: `<div style="background:#22c55e;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 10px rgba(0,0,0,0.4)"></div>`,
-                iconSize: [28, 28],
-                iconAnchor: [14, 26],
+                html: `<div style="background:#22c55e;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 10px rgba(0,0,0,0.5);border:2px solid #fff"></div>`,
+                iconSize: [26, 26],
+                iconAnchor: [13, 24],
               });
               destMarkerRef.current = L.marker([dlat, dlng], { icon: destIcon })
                 .addTo(map).bindPopup('Delivery address');
               const group = L.featureGroup([riderMarkerRef.current, destMarkerRef.current]);
-              map.fitBounds(group.getBounds().pad(0.35));
+              map.fitBounds(group.getBounds().pad(0.4));
             }
           } catch { /* geocode is best-effort */ }
+        }
+
+        // Draw the real road route + compute a live ETA (throttled to ~15s).
+        if (destCoordsRef.current && (!routeLineRef.current || Date.now() - routeAtRef.current > 15000)) {
+          routeAtRef.current = Date.now();
+          const dest = destCoordsRef.current;
+          try {
+            const rr = await fetch(
+              `https://router.project-osrm.org/route/v1/driving/${target[1]},${target[0]};${dest[1]},${dest[0]}?overview=full&geometries=geojson`,
+            );
+            const rj = await rr.json();
+            const route = rj?.routes?.[0];
+            if (!cancelled && route) {
+              const coords = (route.geometry.coordinates as number[][]).map((c) => [c[1], c[0]] as [number, number]);
+              if (routeLineRef.current) routeLineRef.current.setLatLngs(coords);
+              else routeLineRef.current = L.polyline(coords, {
+                color: ORANGE, weight: 4, opacity: 0.9, lineCap: 'round', lineJoin: 'round',
+              }).addTo(map);
+              setEta({ km: route.distance / 1000, mins: Math.max(1, Math.round(route.duration / 60)) });
+            } else throw new Error('no route');
+          } catch {
+            if (!cancelled) {
+              const km = haversineKm(target, dest);
+              setEta({ km, mins: Math.max(1, Math.round((km / 22) * 60)) }); // ~22 km/h city speed
+            }
+          }
         }
       } catch { /* leaflet failed to load */ }
     })();
@@ -224,7 +309,14 @@ export default function TrackPage() {
       <div className="max-w-2xl mx-auto px-4 py-5">
         <div className="flex items-center justify-between mb-4">
           <button
-            onClick={() => { setSubmitted(false); setData(null); leafletRef.current = null; riderMarkerRef.current = null; destMarkerRef.current = null; destGeocodedRef.current = false; }}
+            onClick={() => {
+              setSubmitted(false); setData(null); setEta(null);
+              if (animRef.current != null) cancelAnimationFrame(animRef.current);
+              animRef.current = null;
+              leafletRef.current = null; riderMarkerRef.current = null; destMarkerRef.current = null;
+              routeLineRef.current = null; destGeocodedRef.current = false;
+              destCoordsRef.current = null; riderPosRef.current = null; routeAtRef.current = 0;
+            }}
             className="inline-flex items-center gap-1.5 text-[13px] text-white/50 hover:text-white transition-colors"
           >
             <ArrowLeft size={15} /> Track another
@@ -293,11 +385,28 @@ export default function TrackPage() {
             {/* Live map */}
             {outForDelivery && data.lat != null && data.lng != null ? (
               <div className="rounded-2xl overflow-hidden border border-white/10 mb-4">
-                <div ref={mapRef} style={{ height: 340, width: '100%', background: '#0a0a0a' }} />
+                <style dangerouslySetInnerHTML={{ __html: `@keyframes mbTrackPulse{0%{transform:scale(.6);opacity:.7}70%{transform:scale(2.4);opacity:0}100%{opacity:0}}.mb-rider-pulse{position:absolute;inset:0;border-radius:9999px;background:rgba(255,107,0,.45);animation:mbTrackPulse 1.8s ease-out infinite}` }} />
+                <div className="relative">
+                  <div ref={mapRef} style={{ height: 360, width: '100%', background: '#0a0a0a' }} />
+                  {eta && (
+                    <div className="absolute top-3 left-3 z-[500] bg-[#0d0d0d]/90 backdrop-blur border border-white/10 rounded-xl px-3 py-2 shadow-xl">
+                      <p className="text-[9px] uppercase tracking-widest text-white/40 leading-none mb-1">Arriving in</p>
+                      <p className="text-[19px] font-extrabold leading-none" style={{ color: ORANGE }}>~{eta.mins} min</p>
+                      <p className="text-[11px] text-white/50 mt-1 leading-none">{eta.km.toFixed(1)} km away</p>
+                    </div>
+                  )}
+                  {data.live && (
+                    <div className="absolute top-3 right-3 z-[500] inline-flex items-center gap-1.5 bg-[#0d0d0d]/90 backdrop-blur border border-green-500/30 rounded-full px-2.5 py-1 text-[11px] font-semibold text-green-400">
+                      <Radio size={12} className="animate-pulse" /> Live
+                    </div>
+                  )}
+                </div>
                 <div className="bg-[#0d0d0d] px-4 py-3 flex items-center gap-2 text-[12px] text-white/50">
                   <Navigation size={13} color={ORANGE} />
-                  {data.live ? 'Rider is on the move — updating live' : 'Waiting for the next location update…'}
-                  {data.updatedAt && <span className="ml-auto text-white/30">{new Date(data.updatedAt).toLocaleTimeString()}</span>}
+                  {eta && eta.km <= 0.3
+                    ? <span className="text-green-400 font-semibold">Your rider is arriving now! 🎉</span>
+                    : data.live ? 'Rider is on the move — updating live' : 'Waiting for the next location update…'}
+                  {data.updatedAt && <span className="ml-auto text-white/30">Updated {new Date(data.updatedAt).toLocaleTimeString()}</span>}
                 </div>
               </div>
             ) : delivered ? (

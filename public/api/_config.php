@@ -23,15 +23,15 @@ ini_set('display_errors', '0');
 error_reporting(0);
 
 // ── PayU Payment Gateway ──────────────────────────────────────────────────
-define('PAYU_KEY',  mm_env('PAYU_KEY',  'uB3THG'));
-define('PAYU_SALT', mm_env('PAYU_SALT', 'JfzpDUF94Ix2YE5cCxgjmm2LoxWewsJs'));
-define('PAYU_MODE', mm_env('PAYU_MODE', 'test'));   // 'test' or 'live'
+define('PAYU_KEY',  mm_env('PAYU_KEY',  ''));
+define('PAYU_SALT', mm_env('PAYU_SALT', ''));
+define('PAYU_MODE', mm_env('PAYU_MODE', 'test'));   // 'test' or 'live' — set in api/.env
 
-// ── Admin API Key (must match NEXT_PUBLIC_ADMIN_SETUP_KEY in .env.local) ─
-define('ADMIN_KEY', mm_env('ADMIN_KEY', 'Amarjeetmuscle@321'));
+// ── Admin API Key (set the real value ONLY in api/.env — never hard-code here) ─
+define('ADMIN_KEY', mm_env('ADMIN_KEY', ''));
 
-// ── Delivery Rider Key (shared with riders to open /delivery panel) ──────
-define('DELIVERY_KEY', mm_env('DELIVERY_KEY', 'muscle-rider-2025'));
+// ── Delivery Rider Key (set the real value ONLY in api/.env) ──────────────
+define('DELIVERY_KEY', mm_env('DELIVERY_KEY', ''));
 
 // ── Email ─────────────────────────────────────────────────────────────────
 // Three mailboxes, each with a clear job:

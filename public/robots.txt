@@ -11,5 +11,6 @@ Disallow: /orders/
 Disallow: /wishlist/
 Disallow: /data/
 
-# Sitemap
+# Sitemaps
 Sitemap: https://musclemantra.shop/sitemap.xml
+Sitemap: https://musclemantra.shop/sitemap-products.php
