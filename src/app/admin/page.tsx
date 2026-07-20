@@ -10,7 +10,7 @@ import {
   ChevronRight, Eye, Edit2, Trash2, PlusCircle, Filter,
   Search, Mail, Check, X, Truck, AlertTriangle, Percent,
   MessageSquare, Save, Plus, Image as ImageIcon,
-  Megaphone, Film, Upload, Award, Play, LayoutGrid, Minus,
+  Megaphone, Film, Upload, Download, Award, Play, LayoutGrid, Minus,
   Loader2, KeyRound, Shield, UserPlus, MailCheck, Crown,
   Dumbbell, Calendar, Clock, Phone, RefreshCw,
 } from 'lucide-react';
@@ -23,6 +23,7 @@ import {
   getTrainers, addTrainer, updateTrainer, deleteTrainer, type Trainer,
   getPlans, addPlan, updatePlan, deletePlan, type TrainingPlan,
 } from '@/lib/store';
+import { parseCSV, toCSV, downloadCSV } from '@/lib/csv';
 import { useToast } from '@/components/ToastProvider';
 import AdminGate from '@/components/AdminGate';
 import {
@@ -1013,6 +1014,123 @@ function AdminDashboard() {
     setProductList(getProducts());
   };
 
+  // ── Bulk product import / export (Excel-compatible CSV) ──────────────────
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const PRODUCT_CSV_HEADERS = ['name', 'brand', 'category', 'price', 'mrp', 'stock', 'flavors', 'sizes', 'tags', 'image', 'description'];
+
+  // Download a ready-to-fill CSV template (opens in Excel). Multi-value fields
+  // (flavors / sizes / tags) accept values separated by | or comma.
+  const downloadProductTemplate = () => {
+    const example: Record<string, string> = {
+      name: 'Gold Standard Whey 2kg',
+      brand: 'Optimum Nutrition',
+      category: categoryList[0]?.id ?? 'protein',
+      price: '4499',
+      mrp: '5999',
+      stock: '50',
+      flavors: 'Chocolate|Vanilla',
+      sizes: '1kg|2kg',
+      tags: 'whey|protein|muscle',
+      image: 'https://example.com/whey.jpg',
+      description: 'Premium whey protein isolate blend.',
+    };
+    downloadCSV('product-import-template.csv', toCSV(PRODUCT_CSV_HEADERS, [example]));
+  };
+
+  // Export the current catalogue to CSV (edit in Excel, re-import to bulk-update later).
+  const exportProductsCsv = () => {
+    const rows = productList.map(p => ({
+      name: p.name, brand: p.brand, category: p.category,
+      price: p.price, mrp: p.originalPrice, stock: p.stock,
+      flavors: (p.flavors ?? []).join('|'), sizes: (p.sizes ?? []).join('|'), tags: (p.tags ?? []).join('|'),
+      image: p.image ?? '', description: p.description ?? '',
+    }));
+    downloadCSV(`products-${new Date().toISOString().slice(0, 10)}.csv`, toCSV(PRODUCT_CSV_HEADERS, rows));
+  };
+
+  const resolveCategory = (raw: string): string => {
+    const v = raw.trim().toLowerCase();
+    if (!v) return categoryList[0]?.id ?? 'protein';
+    const match = categoryList.find(c => c.id.toLowerCase() === v || c.label.toLowerCase() === v);
+    return match ? match.id : (categoryList[0]?.id ?? v);
+  };
+  const splitMulti = (s: string): string[] => (s ?? '').split(/[|,]/).map(x => x.trim()).filter(Boolean);
+
+  const handleCsvImport = async (file: File | null) => {
+    if (!file) return;
+    setImporting(true);
+    let added = 0, failed = 0, serverSynced = 0;
+    try {
+      const rows = parseCSV(await file.text());
+      if (rows.length === 0) { toast.push({ variant: 'error', title: 'CSV is empty' }); setImporting(false); return; }
+      if (rows.length > 500) { toast.push({ variant: 'error', title: 'Too many rows', description: 'Max 500 products per import.' }); setImporting(false); return; }
+
+      for (const r of rows) {
+        const name = (r.name ?? '').trim();
+        const price = Math.max(0, Math.floor(Number(r.price) || 0));
+        if (!name || price <= 0) { failed++; continue; }
+
+        const mrp = Math.max(0, Math.floor(Number(r.mrp ?? r.originalprice) || 0));
+        const originalPrice = mrp > price ? mrp : price;
+        const discount = originalPrice > price ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
+        const images = splitMulti(r.image ?? '');
+
+        const payload = {
+          name,
+          brand: (r.brand ?? '').trim(),
+          category: resolveCategory(r.category ?? ''),
+          price,
+          originalPrice,
+          discount,
+          stock: Math.max(0, Math.floor(Number(r.stock) || 0)),
+          flavors: splitMulti(r.flavors ?? ''),
+          sizes: splitMulti(r.sizes ?? ''),
+          tags: splitMulti(r.tags ?? ''),
+          image: images[0] ?? '',
+          images,
+          description: (r.description ?? '').trim(),
+        };
+
+        // Persist to the server products table first so the id matches and
+        // server-side price validation recognises this product. Falls back to
+        // a local-only id if the server is unreachable.
+        let serverId: string | undefined;
+        try {
+          const res = await fetch('/api/products/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) { const d = await res.json().catch(() => null); serverId = d?.id ?? undefined; if (serverId) serverSynced++; }
+        } catch { /* offline / no server — local id */ }
+
+        addProduct({
+          ...payload,
+          id: serverId,
+          sku: '',
+          reorderAt: 20,
+          deliveryTime: '1-2 days',
+          rating: 0,
+          reviews: 0,
+          active: true,
+        });
+        added++;
+      }
+
+      setProductList(getProducts());
+      toast.push({
+        variant: added > 0 ? 'success' : 'error',
+        title: `${added} product${added === 1 ? '' : 's'} imported`,
+        description: `${serverSynced} synced to server${failed ? ` · ${failed} skipped (missing name/price)` : ''}`,
+      });
+    } catch {
+      toast.push({ variant: 'error', title: 'Import failed', description: 'Could not read the CSV file.' });
+    }
+    setImporting(false);
+    if (csvInputRef.current) csvInputRef.current.value = '';
+  };
+
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
     return productList.filter(p => {
@@ -1370,6 +1488,20 @@ function AdminDashboard() {
                     <option value="all">All categories</option>
                     {categoryList.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
+                  <button onClick={downloadProductTemplate} title="Download a sample CSV to fill in Excel"
+                    className="flex items-center gap-2 px-3.5 py-2.5 bg-[#111] border border-[rgba(255,255,255,0.1)] text-[rgba(245,245,245,0.8)] hover:text-white text-sm font-bold rounded-xl transition-all">
+                    <Download size={15} /> Template
+                  </button>
+                  <button onClick={exportProductsCsv} title="Export current products to a CSV file"
+                    className="flex items-center gap-2 px-3.5 py-2.5 bg-[#111] border border-[rgba(255,255,255,0.1)] text-[rgba(245,245,245,0.8)] hover:text-white text-sm font-bold rounded-xl transition-all">
+                    <Download size={15} /> Export
+                  </button>
+                  <button onClick={() => csvInputRef.current?.click()} disabled={importing} title="Bulk-upload new products from an Excel / CSV file"
+                    className="flex items-center gap-2 px-3.5 py-2.5 bg-[#111] border border-[rgba(255,255,255,0.1)] text-[rgba(245,245,245,0.8)] hover:text-white text-sm font-bold rounded-xl transition-all disabled:opacity-50">
+                    {importing ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} {importing ? 'Importing…' : 'Import CSV'}
+                  </button>
+                  <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden"
+                    onChange={e => handleCsvImport(e.target.files?.[0] ?? null)} />
                   <button onClick={openNewProduct}
                     className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all">
                     <PlusCircle size={15} /> Add Product
