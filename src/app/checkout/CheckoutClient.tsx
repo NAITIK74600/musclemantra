@@ -303,12 +303,26 @@ export default function CheckoutClient() {
 
     // ── Online payment via PayU ─────────────────────────────────────────────
     try {
+      // 1) Create the order first so the SERVER computes and owns the amount.
+      const saveRes = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(orderPayload('Payment Pending')),
+      });
+      const saveData = await saveRes.json().catch(() => ({} as { error?: string; total?: number }));
+      if (!saveRes.ok) {
+        setLoading(false);
+        setApiError(saveData?.error || 'Could not save order. Please try again.');
+        return;
+      }
+
+      // 2) Ask the server for the PayU hash — amount is derived from the order,
+      //    not from anything the browser can change.
       const res = await fetch('/api/payu-hash', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           txnid,
-          amount: amountStr,
           productinfo,
           firstname: form.name.trim(),
           email: form.email.trim() || authUser.email,
@@ -324,40 +338,28 @@ export default function CheckoutClient() {
         return;
       }
 
-      // Save order info so success page can display it
-      sessionStorage.setItem('mm_payu_order', JSON.stringify({ txnid, amount: amountStr }));
-
-      // Save pending order to server — must succeed before redirecting to PayU
-      const saveRes = await fetch('/api/create-order', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify(orderPayload('Payment Pending')),
-      });
-      const saveData = await saveRes.json().catch(() => ({} as { error?: string }));
-      if (!saveRes.ok) {
-        setLoading(false);
-        setApiError(saveData?.error || 'Could not save order. Please try again.');
-        return;
-      }
+      // The server is the single source of truth for the payable amount.
+      const serverAmount = String(data.amount ?? amountStr);
+      sessionStorage.setItem('mm_payu_order', JSON.stringify({ txnid, amount: serverAmount }));
       cacheOrderId(txnid);
 
       clearCart();
       persistAddress(form);
 
-      // Build the PayU form and submit it programmatically
+      // 3) Build the PayU form from the server-signed values and submit it.
       const siteUrl = window.location.origin;
       const params: Record<string, string> = {
         key:         data.key,
         txnid,
-        amount:      amountStr,
-        productinfo,
-        firstname:   form.name.trim(),
-        email:       form.email.trim() || authUser.email,
+        amount:      serverAmount,
+        productinfo: data.productinfo ?? productinfo,
+        firstname:   data.firstname ?? form.name.trim(),
+        email:       data.email ?? (form.email.trim() || authUser.email),
         phone:       form.phone.trim(),
         surl:        `${siteUrl}/api/payu-return`,
         furl:        `${siteUrl}/api/payu-return`,
         hash:        data.hash,
-        udf1:        form.phone.trim(),
+        udf1:        data.udf1 ?? form.phone.trim(),
         service_provider: 'payu_paisa',
       };
 

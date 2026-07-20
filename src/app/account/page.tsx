@@ -9,11 +9,12 @@ import {
   Package, Heart, RefreshCw, MapPin, CreditCard, Star, Bell,
   HeadphonesIcon, User, ChevronRight, TrendingUp, Gift, Medal,
   ShoppingBag, Zap, Award,
-  Plus, Edit2, Trash2, Check, Copy, Calendar, Pause, Truck,
-  Save, MessageSquare, Share2, ShoppingCart, Home, Briefcase, Percent, LogOut
+  Plus, Edit2, Trash2, Copy, Calendar, Pause, Truck,
+  Save, MessageSquare, Share2, ShoppingCart, LogOut
 } from 'lucide-react';
 import { products } from '@/lib/data';
-import { getCurrentUser, onAuthChange, signOut, initials, type User as AuthUser } from '@/lib/auth';
+import { getWishlist, removeWishlist, onStoreChange } from '@/lib/store';
+import { getCurrentUser, onAuthChange, signOut, initials, getToken, type User as AuthUser } from '@/lib/auth';
 
 const sidebarItems = [
   { id: 'dashboard', icon: TrendingUp, label: 'Dashboard' },
@@ -30,47 +31,30 @@ const sidebarItems = [
   { id: 'profile', icon: User, label: 'Profile Settings' },
 ];
 
-const mockOrders = [
-  { id: 'ORD-20241201', date: '1 Dec 2024', status: 'delivered', total: 5499, product: 'Gold Standard Whey + Creatine' },
-  { id: 'ORD-20241125', date: '25 Nov 2024', status: 'shipped', total: 2199, product: 'C4 Pre-Workout 200g' },
-  { id: 'ORD-20241118', date: '18 Nov 2024', status: 'processing', total: 3799, product: 'BCAA Pro + Fat Burner' },
-  { id: 'ORD-20241110', date: '10 Nov 2024', status: 'delivered', total: 2899, product: 'MB Creatine 300g' },
-];
+interface AccountOrder {
+  id: string;
+  date: string;
+  status: string;   // raw server status label
+  total: number;
+  product: string;  // item preview
+}
 
-const addresses = [
-  { id: 1, type: 'Home', icon: Home, name: 'Rohit Sharma', line: 'Flat 402, Sunrise Apartments, Boring Road', city: 'Patna, Bihar 800001', phone: '+91 98000 00000', default: true },
-  { id: 2, type: 'Work', icon: Briefcase, name: 'Rohit Sharma', line: '3rd Floor, Tech Park, Fraser Road', city: 'Patna, Bihar 800001', phone: '+91 98000 00000', default: false },
-];
+interface SavedAddress {
+  name: string;
+  phone: string;
+  address: string;
+  area: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
 
-const paymentMethods = [
-  { id: 1, kind: 'Visa', last4: '4242', expiry: '08/27', default: true },
-  { id: 2, kind: 'Mastercard', last4: '8819', expiry: '11/26', default: false },
-  { id: 3, kind: 'UPI', last4: 'rohit@okhdfc', expiry: '', default: false },
-];
-
-const subscriptions = [
-  { id: 1, product: 'ON Gold Standard Whey 2kg', freq: 'Every 30 days', next: '15 Jun 2024', price: 2999, status: 'active' },
-  { id: 2, product: 'MB Creatine 300g', freq: 'Every 45 days', next: '28 Jun 2024', price: 1299, status: 'active' },
-  { id: 3, product: 'C4 Pre-Workout 390g', freq: 'Every 30 days', next: '\u2014', price: 2199, status: 'paused' },
-];
-
-const myReviews = [
-  { id: 1, product: 'ON Gold Standard Whey 2kg', rating: 5, comment: 'Best whey I\u2019ve used \u2014 mixes instantly and tastes great.', date: '2 Dec 2024' },
-  { id: 2, product: 'C4 Pre-Workout 200g', rating: 4, comment: 'Solid energy and focus, but a bit too sweet.', date: '26 Nov 2024' },
-];
-
-const referrals = [
-  { name: 'Amit Kumar', status: 'joined', earned: 200 },
-  { name: 'Sneha Patel', status: 'joined', earned: 200 },
-  { name: 'Vikram R.', status: 'pending', earned: 0 },
-];
-
-const rewardHistory = [
-  { label: 'Order ORD-20241201', points: '+120', date: '1 Dec 2024', positive: true },
-  { label: 'Referral bonus \u2014 Amit', points: '+200', date: '28 Nov 2024', positive: true },
-  { label: 'Redeemed \u2014 \u20b9100 off', points: '-100', date: '20 Nov 2024', positive: false },
-  { label: 'Order ORD-20241110', points: '+90', date: '10 Nov 2024', positive: true },
-];
+// No fake demo data — these sections are populated from real user data only.
+const paymentMethods: { id: number; kind: string; last4: string; expiry: string; default: boolean }[] = [];
+const subscriptions: { id: number; product: string; freq: string; next: string; price: number; status: string }[] = [];
+const myReviews: { id: number; product: string; rating: number; comment: string; date: string }[] = [];
+const referrals: { name: string; status: string; earned: number }[] = [];
+const rewardHistory: { label: string; points: string; date: string; positive: boolean }[] = [];
 
 const statusColors: Record<string, string> = {
   delivered: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
@@ -79,11 +63,22 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-red-500/15 text-red-400 border-red-500/20',
 };
 
+// Map any server status label to a badge colour bucket.
+function statusBucket(status: string): keyof typeof statusColors {
+  const s = status.toLowerCase();
+  if (s.includes('cancel') || s.includes('fail') || s.includes('return')) return 'cancelled';
+  if (s.includes('deliver')) return 'delivered';
+  if (s.includes('ship') || s.includes('transit') || s.includes('out for')) return 'shipped';
+  return 'processing';
+}
+
 export default function AccountPage() {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [activeSection, setActiveSection] = useState('dashboard');
+  const [orders, setOrders] = useState<AccountOrder[]>([]);
+  const [ordersLoaded, setOrdersLoaded] = useState(false);
 
   useEffect(() => {
     const u = getCurrentUser();
@@ -97,15 +92,56 @@ export default function AccountPage() {
     });
   }, [router]);
 
-  const [wishlist, setWishlist] = useState(() => products.slice(0, 4).map(p => p.id));
-  const [notifications, setNotifications] = useState([
-    { id: 1, icon: Truck, title: 'Order shipped', body: 'Your order ORD-20241125 is on the way.', time: '2h ago', unread: true, color: '#60a5fa' },
-    { id: 2, icon: Gift, title: 'You earned 120 points', body: 'Points credited for your recent order.', time: '1d ago', unread: true, color: '#a78bfa' },
-    { id: 3, icon: Percent, title: 'Flat 20% off protein', body: 'Limited-time offer just for you.', time: '2d ago', unread: false, color: '#FF6B00' },
-    { id: 4, icon: Check, title: 'Order delivered', body: 'ORD-20241201 was delivered. Rate it now!', time: '5d ago', unread: false, color: '#34d399' },
-  ]);
+  // Fetch the signed-in account's real orders (token-scoped on the server).
+  // A fresh account has none — no fake/demo orders are ever shown.
+  useEffect(() => {
+    const load = async () => {
+      const token = getToken();
+      if (!token) { setOrders([]); setOrdersLoaded(true); return; }
+      try {
+        const res = await fetch('/api/get-orders', { headers: { Authorization: `Bearer ${token}` } });
+        const data: Record<string, unknown>[] = res.ok ? await res.json() : [];
+        const mapped: AccountOrder[] = (Array.isArray(data) ? data : []).map(r => {
+          const items = Array.isArray(r.items) ? (r.items as { name?: string }[]) : [];
+          const names = items.map(i => i?.name).filter(Boolean) as string[];
+          const preview = names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2} more` : '');
+          const created = String(r.created_at ?? r.createdAt ?? '');
+          const d = created ? new Date(created) : null;
+          return {
+            id: String(r.id ?? ''),
+            date: d && !isNaN(d.getTime()) ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+            status: String(r.status ?? 'Pending'),
+            total: Number(r.total) || 0,
+            product: preview || 'Order',
+          };
+        });
+        setOrders(mapped);
+      } catch {
+        setOrders([]);
+      }
+      setOrdersLoaded(true);
+    };
+    load();
+    return onAuthChange(() => load());
+  }, []);
+
+  // Real wishlist (from the shared store) + saved addresses (from checkout).
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [notifications, setNotifications] = useState<{ id: number; icon: typeof Truck; title: string; body: string; time: string; unread: boolean; color: string }[]>([]);
+  useEffect(() => {
+    setWishlist(getWishlist());
+    try {
+      const raw = localStorage.getItem('mb_addresses');
+      const list = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(list)) setSavedAddresses(list);
+    } catch { /* ignore */ }
+    return onStoreChange(() => setWishlist(getWishlist()));
+  }, []);
   const wishlistProducts = products.filter(p => wishlist.includes(p.id));
-  const removeWish = (id: string) => setWishlist(w => w.filter(x => x !== id));
+  const totalSpent = orders.reduce((s, o) => s + o.total, 0);
+  const referralCode = ((user?.name || user?.email || 'MUSCLE').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6) || 'MUSCLE') + '200';
+  const removeWish = (id: string) => { removeWishlist(id); setWishlist(getWishlist()); };
   const markRead = (id: number) => setNotifications(n => n.map(x => x.id === id ? { ...x, unread: false } : x));
   const markAllRead = () => setNotifications(n => n.map(x => ({ ...x, unread: false })));
 
@@ -178,10 +214,10 @@ export default function AccountPage() {
                 {/* Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {[
-                    { icon: Package, label: 'Total Orders', value: '12', color: '#FF6B00' },
-                    { icon: Heart, label: 'Wishlist Items', value: '18', color: '#f472b6' },
-                    { icon: Gift, label: 'Reward Points', value: '450', color: '#a78bfa' },
-                    { icon: ShoppingBag, label: 'Total Spent', value: '₹18,999', color: '#34d399' },
+                    { icon: Package, label: 'Total Orders', value: String(orders.length), color: '#FF6B00' },
+                    { icon: Heart, label: 'Wishlist Items', value: String(wishlistProducts.length), color: '#f472b6' },
+                    { icon: Gift, label: 'Reward Points', value: '0', color: '#a78bfa' },
+                    { icon: ShoppingBag, label: 'Total Spent', value: `₹${totalSpent.toLocaleString('en-IN')}`, color: '#34d399' },
                   ].map((s, i) => (
                     <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
                       className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-4 text-center">
@@ -202,13 +238,13 @@ export default function AccountPage() {
                         <Award size={18} className="text-white" />
                         <span className="font-[var(--font-montserrat)] font-black text-white text-lg tracking-widest">M3 ELITE</span>
                       </div>
-                      <p className="text-white/80 text-sm mb-1">ROHIT SHARMA · Member since 2023</p>
-                      <p className="text-white font-bold text-sm">You are saving more! <span className="text-yellow-300">⚡ 450 Points</span></p>
+                      <p className="text-white/80 text-sm mb-1">{(user.name || user.email || 'Member').toUpperCase()}</p>
+                      <p className="text-white font-bold text-sm">Earn points on every order <span className="text-yellow-300">⚡ 0 Points</span></p>
                       <div className="mt-3 flex items-center gap-2">
                         <div className="h-1.5 rounded-full bg-white/20 flex-1">
-                          <div className="h-full w-[45%] bg-white rounded-full" />
+                          <div className="h-full w-[2%] bg-white rounded-full" />
                         </div>
-                        <span className="text-white/80 text-[11px]">450 / 1000 pts to ELITE+</span>
+                        <span className="text-white/80 text-[11px]">0 / 1000 pts to ELITE+</span>
                       </div>
                     </div>
                     <div className="w-20 h-20 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0">
@@ -246,7 +282,12 @@ export default function AccountPage() {
                     <button onClick={() => setActiveSection('orders')} className="text-xs text-[#FF6B00] font-bold flex items-center gap-1">View All <ChevronRight size={12} /></button>
                   </div>
                   <div className="divide-y divide-[rgba(255,255,255,0.04)]">
-                    {mockOrders.map(o => (
+                    {ordersLoaded && orders.length === 0 && (
+                      <div className="px-5 py-10 text-center text-[13px] text-[rgba(245,245,245,0.4)]">
+                        No orders yet. <Link href="/products" className="text-[#FF6B00] font-bold">Start shopping</Link>
+                      </div>
+                    )}
+                    {orders.slice(0, 4).map(o => (
                       <div key={o.id} className="flex items-center gap-4 px-5 py-4 hover:bg-white/[0.02] transition-colors">
                         <div className="w-10 h-10 rounded-xl bg-[rgba(255,107,0,0.1)] flex items-center justify-center shrink-0">
                           <Package size={16} className="text-[#FF6B00]" />
@@ -256,8 +297,8 @@ export default function AccountPage() {
                           <p className="text-[11px] text-[rgba(245,245,245,0.4)]">{o.id} · {o.date}</p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-[13px] font-bold text-white">₹{o.total.toLocaleString()}</p>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border capitalize ${statusColors[o.status]}`}>{o.status}</span>
+                          <p className="text-[13px] font-bold text-white">₹{o.total.toLocaleString('en-IN')}</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColors[statusBucket(o.status)]}`}>{o.status}</span>
                         </div>
                       </div>
                     ))}
@@ -270,7 +311,15 @@ export default function AccountPage() {
             {activeSection === 'orders' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">My Orders</h2>
-                {mockOrders.map(o => (
+                {ordersLoaded && orders.length === 0 && (
+                  <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] py-16 text-center">
+                    <Package size={40} className="text-[rgba(255,107,0,0.4)] mx-auto mb-3" />
+                    <p className="text-white font-bold mb-1">No orders yet</p>
+                    <p className="text-[13px] text-[rgba(245,245,245,0.4)] mb-5">Your orders will appear here once you place one.</p>
+                    <Link href="/products" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold rounded-xl text-sm transition-all"><ShoppingBag size={15} /> Shop Now</Link>
+                  </div>
+                )}
+                {orders.map(o => (
                   <div key={o.id} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
                     <div className="flex items-center justify-between flex-wrap gap-3">
                       <div className="flex items-center gap-4">
@@ -283,14 +332,14 @@ export default function AccountPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${statusColors[o.status]}`}>{o.status}</span>
-                        <span className="text-[15px] font-black text-white">₹{o.total.toLocaleString()}</span>
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusColors[statusBucket(o.status)]}`}>{o.status}</span>
+                        <span className="text-[15px] font-black text-white">₹{o.total.toLocaleString('en-IN')}</span>
                       </div>
                     </div>
                     <div className="flex gap-2 mt-4 pt-4 border-t border-[rgba(255,255,255,0.06)]">
                       <Link href="/orders" className="flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-bold text-white bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.1)] rounded-lg transition-all"><Truck size={13} /> Track</Link>
                       <Link href="/products" className="flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-bold text-white bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.1)] rounded-lg transition-all"><RefreshCw size={13} /> Reorder</Link>
-                      <button className="flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-bold text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all ml-auto">Invoice</button>
+                      <Link href={`/invoice/${o.id}`} className="flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-bold text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all ml-auto">Invoice</Link>
                     </div>
                   </div>
                 ))}
@@ -337,6 +386,13 @@ export default function AccountPage() {
             {activeSection === 'subscriptions' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Subscriptions</h2>
+                {subscriptions.length === 0 && (
+                  <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] py-16 text-center">
+                    <RefreshCw size={40} className="text-[rgba(255,107,0,0.4)] mx-auto mb-3" />
+                    <p className="text-white font-bold mb-1">No active subscriptions</p>
+                    <p className="text-[13px] text-[rgba(245,245,245,0.4)]">You have no auto-delivery subscriptions yet.</p>
+                  </div>
+                )}
                 {subscriptions.map(s => (
                   <div key={s.id} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
                     <div className="flex items-center justify-between flex-wrap gap-3">
@@ -364,29 +420,29 @@ export default function AccountPage() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Saved Addresses</h2>
-                  <button className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Plus size={15} /> Add Address</button>
+                  <Link href="/checkout" className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Plus size={15} /> Add Address</Link>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {addresses.map(a => (
-                    <div key={a.id} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-9 h-9 rounded-xl bg-[rgba(255,107,0,0.12)] flex items-center justify-center"><a.icon size={16} className="text-[#FF6B00]" /></div>
-                          <span className="text-white font-bold text-[14px]">{a.type}</span>
-                          {a.default && <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-400 text-[9px] font-bold rounded-full border border-emerald-500/20">DEFAULT</span>}
+                {savedAddresses.length === 0 ? (
+                  <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] py-16 text-center">
+                    <MapPin size={40} className="text-[rgba(255,107,0,0.4)] mx-auto mb-3" />
+                    <p className="text-white font-bold mb-1">No saved addresses</p>
+                    <p className="text-[13px] text-[rgba(245,245,245,0.4)]">Addresses you use at checkout will be saved here.</p>
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {savedAddresses.map((a, i) => (
+                      <div key={i} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-9 h-9 rounded-xl bg-[rgba(255,107,0,0.12)] flex items-center justify-center"><MapPin size={16} className="text-[#FF6B00]" /></div>
+                          <span className="text-white font-bold text-[14px]">{a.name || 'Saved Address'}</span>
                         </div>
-                        <div className="flex gap-1">
-                          <button className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded-lg transition-all"><Edit2 size={13} /></button>
-                          <button className="p-1.5 text-[rgba(245,245,245,0.4)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={13} /></button>
-                        </div>
+                        <p className="text-[12px] text-[rgba(245,245,245,0.5)]">{[a.address, a.area].filter(Boolean).join(', ')}</p>
+                        <p className="text-[12px] text-[rgba(245,245,245,0.5)]">{[a.city, a.state, a.pincode].filter(Boolean).join(', ')}</p>
+                        {a.phone && <p className="text-[12px] text-[rgba(245,245,245,0.4)] mt-1">{a.phone}</p>}
                       </div>
-                      <p className="text-[13px] font-semibold text-white">{a.name}</p>
-                      <p className="text-[12px] text-[rgba(245,245,245,0.5)] mt-0.5">{a.line}</p>
-                      <p className="text-[12px] text-[rgba(245,245,245,0.5)]">{a.city}</p>
-                      <p className="text-[12px] text-[rgba(245,245,245,0.4)] mt-1">{a.phone}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -395,8 +451,15 @@ export default function AccountPage() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Payment Methods</h2>
-                  <button className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Plus size={15} /> Add Method</button>
+                  <span className="text-[11px] text-[rgba(245,245,245,0.4)]">Pay securely at checkout</span>
                 </div>
+                {paymentMethods.length === 0 && (
+                  <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] py-16 text-center">
+                    <CreditCard size={40} className="text-[rgba(255,107,0,0.4)] mx-auto mb-3" />
+                    <p className="text-white font-bold mb-1">No saved payment methods</p>
+                    <p className="text-[13px] text-[rgba(245,245,245,0.4)]">We never store your card details. Pay via UPI, cards or Cash on Delivery at checkout.</p>
+                  </div>
+                )}
                 <div className="grid sm:grid-cols-2 gap-4">
                   {paymentMethods.map(m => (
                     <div key={m.id} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
@@ -420,6 +483,13 @@ export default function AccountPage() {
             {activeSection === 'reviews' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">My Reviews</h2>
+                {myReviews.length === 0 && (
+                  <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] py-16 text-center">
+                    <Star size={40} className="text-[rgba(255,107,0,0.4)] mx-auto mb-3" />
+                    <p className="text-white font-bold mb-1">No reviews yet</p>
+                    <p className="text-[13px] text-[rgba(245,245,245,0.4)]">Reviews you write on products will appear here.</p>
+                  </div>
+                )}
                 {myReviews.map(r => (
                   <div key={r.id} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -452,9 +522,9 @@ export default function AccountPage() {
                 <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-[#FF6B00] via-[#E55A00] to-[#cc4700] p-6">
                   <div className="relative z-10">
                     <p className="text-white/80 text-sm">Available Balance</p>
-                    <p className="font-[var(--font-montserrat)] font-black text-white text-4xl mt-1 mb-3">450 <span className="text-lg">pts</span></p>
-                    <p className="text-white/80 text-[12px]">≈ ₹450 in savings · 100 pts = ₹100</p>
-                    <button className="mt-4 px-5 py-2.5 bg-white text-[#FF6B00] text-sm font-black rounded-xl hover:bg-white/90 transition-all">Redeem Points</button>
+                    <p className="font-[var(--font-montserrat)] font-black text-white text-4xl mt-1 mb-3">0 <span className="text-lg">pts</span></p>
+                    <p className="text-white/80 text-[12px]">Earn points on every order · 100 pts = ₹100</p>
+                    <Link href="/products" className="inline-block mt-4 px-5 py-2.5 bg-white text-[#FF6B00] text-sm font-black rounded-xl hover:bg-white/90 transition-all">Start Earning</Link>
                   </div>
                   <Gift size={120} className="absolute -right-4 -bottom-6 text-white/10" />
                 </div>
@@ -474,6 +544,9 @@ export default function AccountPage() {
                 <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden">
                   <div className="px-5 py-4 border-b border-[rgba(255,255,255,0.06)]"><h3 className="font-bold text-white">Points History</h3></div>
                   <div className="divide-y divide-[rgba(255,255,255,0.04)]">
+                    {rewardHistory.length === 0 && (
+                      <p className="px-5 py-8 text-center text-[13px] text-[rgba(245,245,245,0.4)]">No points activity yet.</p>
+                    )}
                     {rewardHistory.map((h, i) => (
                       <div key={i} className="flex items-center justify-between px-5 py-3.5">
                         <div>
@@ -495,6 +568,13 @@ export default function AccountPage() {
                   <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Notifications</h2>
                   <button onClick={markAllRead} className="text-[12px] font-bold text-[#FF6B00] hover:underline">Mark all read</button>
                 </div>
+                {notifications.length === 0 && (
+                  <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] py-16 text-center">
+                    <Bell size={40} className="text-[rgba(255,107,0,0.4)] mx-auto mb-3" />
+                    <p className="text-white font-bold mb-1">No notifications</p>
+                    <p className="text-[13px] text-[rgba(245,245,245,0.4)]">Order updates and offers will show up here.</p>
+                  </div>
+                )}
                 <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden divide-y divide-[rgba(255,255,255,0.04)]">
                   {notifications.map(n => (
                     <button key={n.id} onClick={() => markRead(n.id)} className={`w-full flex items-start gap-4 px-5 py-4 text-left transition-colors ${n.unread ? 'bg-[rgba(255,107,0,0.04)] hover:bg-[rgba(255,107,0,0.07)]' : 'hover:bg-white/[0.02]'}`}>
@@ -516,24 +596,14 @@ export default function AccountPage() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Support Tickets</h2>
-                  <button className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Plus size={15} /> New Ticket</button>
+                  <Link href="/contact" className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Plus size={15} /> New Ticket</Link>
                 </div>
-                {[
-                  { id: '#TK-1042', subject: 'Order not delivered yet', status: 'open', date: '15 May', last: 'Support: We are checking with the courier.' },
-                  { id: '#TK-1037', subject: 'Refund for cancelled order', status: 'resolved', date: '8 May', last: 'Refund of ₹2,199 processed to your account.' },
-                ].map(t => (
-                  <div key={t.id} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[#FF6B00] text-[12px] font-bold">{t.id}</span>
-                        <span className="text-white text-[14px] font-semibold">{t.subject}</span>
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${t.status === 'resolved' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-[rgba(255,107,0,0.15)] text-[#FF6B00] border-[rgba(255,107,0,0.2)]'}`}>{t.status}</span>
-                    </div>
-                    <p className="text-[12px] text-[rgba(245,245,245,0.5)] flex items-center gap-1.5"><MessageSquare size={12} /> {t.last}</p>
-                    <p className="text-[10px] text-[rgba(245,245,245,0.35)] mt-2">Updated {t.date}</p>
-                  </div>
-                ))}
+                <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] py-16 text-center">
+                  <HeadphonesIcon size={40} className="text-[rgba(255,107,0,0.4)] mx-auto mb-3" />
+                  <p className="text-white font-bold mb-1">No support tickets</p>
+                  <p className="text-[13px] text-[rgba(245,245,245,0.4)] mb-5">Need help? Reach out and we&rsquo;ll get back to you.</p>
+                  <Link href="/contact" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold rounded-xl text-sm transition-all"><MessageSquare size={15} /> Contact Support</Link>
+                </div>
               </motion.div>
             )}
 
@@ -543,9 +613,9 @@ export default function AccountPage() {
                 <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Referral Earnings</h2>
                 <div className="grid sm:grid-cols-3 gap-3">
                   {[
-                    { label: 'Total Earned', value: '₹400', color: '#34d399' },
-                    { label: 'Friends Joined', value: '2', color: '#60a5fa' },
-                    { label: 'Pending', value: '1', color: '#fbbf24' },
+                    { label: 'Total Earned', value: '₹0', color: '#34d399' },
+                    { label: 'Friends Joined', value: '0', color: '#60a5fa' },
+                    { label: 'Pending', value: '0', color: '#fbbf24' },
                   ].map(s => (
                     <div key={s.label} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-4 text-center">
                       <p className="text-2xl font-black" style={{ color: s.color }}>{s.value}</p>
@@ -555,18 +625,20 @@ export default function AccountPage() {
                 </div>
                 <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
                   <p className="text-[13px] font-bold text-white mb-1">Your Referral Code</p>
-                  <p className="text-[12px] text-[rgba(245,245,245,0.4)] mb-3">Share & earn ₹200 for every friend who orders.</p>
+                  <p className="text-[12px] text-[rgba(245,245,245,0.4)] mb-3">Share &amp; earn ₹200 for every friend who orders.</p>
                   <div className="flex gap-2">
                     <div className="flex-1 flex items-center justify-between px-4 py-3 bg-[#0a0a0a] border border-dashed border-[rgba(255,107,0,0.4)] rounded-xl">
-                      <span className="font-mono font-black text-[#FF6B00] tracking-widest">ROHIT200</span>
+                      <span className="font-mono font-black text-[#FF6B00] tracking-widest">{referralCode}</span>
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-3 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Copy size={14} /> Copy</button>
-                    <button className="flex items-center gap-2 px-4 py-3 bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.1)] text-white text-sm font-bold rounded-xl transition-all"><Share2 size={14} /></button>
+                    <button onClick={() => { navigator.clipboard?.writeText(referralCode); }} className="flex items-center gap-2 px-4 py-3 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Copy size={14} /> Copy</button>
                   </div>
                 </div>
                 <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden">
                   <div className="px-5 py-4 border-b border-[rgba(255,255,255,0.06)]"><h3 className="font-bold text-white">Invited Friends</h3></div>
                   <div className="divide-y divide-[rgba(255,255,255,0.04)]">
+                    {referrals.length === 0 && (
+                      <p className="px-5 py-8 text-center text-[13px] text-[rgba(245,245,245,0.4)]">No friends invited yet. Share your code to start earning.</p>
+                    )}
                     {referrals.map((r, i) => (
                       <div key={i} className="flex items-center justify-between px-5 py-3.5">
                         <div className="flex items-center gap-3">
@@ -590,18 +662,17 @@ export default function AccountPage() {
                 <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Profile Settings</h2>
                 <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
                   <div className="flex items-center gap-4 mb-5 pb-5 border-b border-[rgba(255,255,255,0.06)]">
-                    <Image src="https://i.pravatar.cc/72?img=12" alt="Rohit" width={64} height={64} className="rounded-full border-2 border-[#FF6B00]" />
+                    <div className="w-16 h-16 rounded-full border-2 border-[#FF6B00] bg-[rgba(255,107,0,0.15)] flex items-center justify-center text-[#FF6B00] text-xl font-black">{initials(user.name || user.email || 'U')}</div>
                     <div>
-                      <button className="px-4 py-2 bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.1)] text-white text-[12px] font-bold rounded-lg transition-all">Change Photo</button>
-                      <p className="text-[11px] text-[rgba(245,245,245,0.4)] mt-1.5">JPG or PNG, max 2MB</p>
+                      <p className="text-white font-bold text-[15px]">{user.name || 'Your Account'}</p>
+                      <p className="text-[12px] text-[rgba(245,245,245,0.4)] mt-0.5">{user.email}</p>
                     </div>
                   </div>
                   <div className="grid sm:grid-cols-2 gap-4">
                     {[
-                      { label: 'Full Name', value: 'Rohit Sharma' },
-                      { label: 'Email', value: 'rohit@email.com' },
-                      { label: 'Phone', value: '+91 98000 00000' },
-                      { label: 'Date of Birth', value: '12 Aug 1996' },
+                      { label: 'Full Name', value: user.name || '' },
+                      { label: 'Email', value: user.email || '' },
+                      { label: 'Phone', value: user.phone || '' },
                     ].map(f => (
                       <div key={f.label}>
                         <label className="block text-[11px] font-bold text-[rgba(245,245,245,0.45)] uppercase tracking-wide mb-1.5">{f.label}</label>

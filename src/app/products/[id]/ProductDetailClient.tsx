@@ -230,19 +230,13 @@ function ProductDetailInner({ product, catalogue }: { product: AdminProduct; cat
             ))}
           </div>
           <div className="text-[rgba(245,245,245,0.7)] leading-relaxed max-w-2xl">
-            {activeTab === 'description' && <p>{product.description} Premium grade, third-party tested for banned substances. Manufactured in GMP certified facilities.</p>}
-            {activeTab === 'ingredients' && <p>Key ingredients: Whey Protein Concentrate, Cocoa Powder, Lecithin, Artificial Flavors. Allergen warning: Contains Milk and Soy.</p>}
+            {activeTab === 'description' && <p>{product.description}</p>}
+            {activeTab === 'ingredients' && <p>Please refer to the product label for the full ingredient list, nutritional information and allergen warnings. Always read the label before use.</p>}
             {activeTab === 'reviews' && (
-              <div className="space-y-4">
-                {[{ name: 'Rohit K.', rating: 5, text: 'Best whey protein I have ever used. Mixes perfectly and tastes amazing!' }, { name: 'Ankit S.', rating: 4, text: 'Great product, good quality. Delivery was super fast.' }].map(r => (
-                  <div key={r.name} className="p-4 bg-[#111] rounded-xl border border-[rgba(255,255,255,0.06)]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="flex">{[...Array(r.rating)].map((_, i) => <Star key={i} size={13} className="text-[#FF6B00] fill-[#FF6B00]" />)}</div>
-                      <span className="text-sm font-semibold text-white">{r.name}</span>
-                    </div>
-                    <p className="text-sm text-[rgba(245,245,245,0.6)]">{r.text}</p>
-                  </div>
-                ))}
+              <div className="p-6 bg-[#111] rounded-xl border border-[rgba(255,255,255,0.06)] text-center">
+                <Star size={26} className="text-[rgba(255,107,0,0.4)] mx-auto mb-2" />
+                <p className="text-sm font-semibold text-white mb-1">No reviews yet</p>
+                <p className="text-[13px] text-[rgba(245,245,245,0.45)]">Be the first to review this product after your purchase.</p>
               </div>
             )}
           </div>

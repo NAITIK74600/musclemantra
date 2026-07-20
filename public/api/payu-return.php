@@ -49,14 +49,23 @@ $hashSequence = PAYU_SALT . '|' . $status . '|' . $udf10 . '|' . $udf9 . '|' . $
 $computedHash = hash('sha512', $hashSequence);
 $hashValid    = hash_equals($computedHash, strtolower($receivedHash));
 
-// ── Sanitise txnid before using in JSON (alphanumeric + MM prefix only) ──
+// ── Sanitise txnid before using it (alphanumeric + MM prefix only) ──
 $safeTxnid = preg_replace('/[^A-Za-z0-9]/', '', $txnid);
 
 // ── Update order status in MySQL ─────────────────────────────────────────
+$paidOk = false;
 if ($safeTxnid && $hashValid) {
-    $newStatus = (strtolower($status) === 'success') ? 'Payment Received' : 'Payment Failed';
+    $db = getDB();
+    // Defense-in-depth: the amount PayU reports MUST match the stored order
+    // total. If it doesn't, treat it as failed (possible tampering).
+    $ord = $db->prepare("SELECT total FROM orders WHERE id = ? LIMIT 1");
+    $ord->execute([$safeTxnid]);
+    $row      = $ord->fetch();
+    $amountOk = $row && abs((float)$row['total'] - (float)$amount) < 0.5;
+    $paidOk   = (strtolower($status) === 'success') && $amountOk;
+
+    $newStatus = $paidOk ? 'Payment Received' : 'Payment Failed';
     try {
-        $db = getDB();
         $db->prepare("UPDATE orders SET status=?, updated_at=NOW() WHERE id=?")
            ->execute([$newStatus, $safeTxnid]);
         // Record transaction
@@ -65,7 +74,7 @@ if ($safeTxnid && $hashValid) {
              VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status), payu_response=VALUES(payu_response)"
         )->execute([
             $safeTxnid, $mihpayid, $amount,
-            strtolower($status) === 'success' ? 'success' : 'failed',
+            $paidOk ? 'success' : 'failed',
             'payu', $hashValid ? 1 : 0,
             json_encode($_POST),
         ]);
@@ -73,7 +82,7 @@ if ($safeTxnid && $hashValid) {
 }
 
 // ── Redirect to React page ────────────────────────────────────────────────
-if (strtolower($status) === 'success' && $hashValid) {
+if ($paidOk) {
     $params = http_build_query([
         'txnid'    => $safeTxnid,
         'amount'   => $amount,
