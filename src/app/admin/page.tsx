@@ -12,7 +12,7 @@ import {
   MessageSquare, Save, Plus, Image as ImageIcon,
   Megaphone, Film, Upload, Download, Award, Play, LayoutGrid, Minus,
   Loader2, KeyRound, Shield, UserPlus, MailCheck, Crown,
-  Dumbbell, Calendar, Clock, Phone, RefreshCw,
+  Dumbbell, Calendar, Clock, Phone, RefreshCw, Menu,
 } from 'lucide-react';
 import {
   getBrands, saveBrands, getPromos, savePromos, fileToDataURL, uid,
@@ -635,6 +635,7 @@ function AdminDashboard() {
   const toast = useToast();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const adminEmail = getAdminEmail() ?? 'admin';
   const [owner, setOwner] = useState(false);
   useEffect(() => { setOwner(isAdminOwner()); }, []);
@@ -1107,6 +1108,13 @@ function AdminDashboard() {
   const removeProductImage = (idx: number) => {
     setProductDraft(d => d ? { ...d, images: d.images.filter((_, i) => i !== idx) } : d);
   };
+  const [imageUrlInput, setImageUrlInput] = useState('');
+  const addImageUrlToDraft = (raw: string) => {
+    const val = raw.trim();
+    if (!val) return;
+    setProductDraft(d => d ? { ...d, images: [...d.images, val].slice(0, 6) } : d);
+    setImageUrlInput('');
+  };
   const setPrimaryImage = (idx: number) => {
     setProductDraft(d => {
       if (!d) return d;
@@ -1505,8 +1513,8 @@ function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-[#050505] flex">
-      {/* Sidebar */}
-      <aside className={`shrink-0 ${sidebarCollapsed ? 'w-14' : 'w-56'} bg-[#0a0a0a] border-r border-[rgba(255,255,255,0.06)] flex flex-col transition-all duration-300`}>
+      {/* Sidebar — desktop (collapsible, always visible at lg+) */}
+      <aside className={`hidden lg:flex shrink-0 ${sidebarCollapsed ? 'w-14' : 'w-56'} bg-[#0a0a0a] border-r border-[rgba(255,255,255,0.06)] flex-col transition-all duration-300`}>
         {/* Logo */}
         <div className="p-4 border-b border-[rgba(255,255,255,0.06)]">
           {!sidebarCollapsed ? (
@@ -1565,25 +1573,99 @@ function AdminDashboard() {
         </div>
       </aside>
 
+      {/* Sidebar — mobile (slide-in drawer, below lg) */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden"
+            />
+            <motion.aside
+              key="drawer"
+              initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
+              transition={{ type: 'spring', stiffness: 340, damping: 34 }}
+              className="fixed inset-y-0 left-0 z-50 w-72 max-w-[82vw] bg-[#0a0a0a] border-r border-[rgba(255,255,255,0.08)] flex flex-col lg:hidden"
+            >
+              <div className="p-4 border-b border-[rgba(255,255,255,0.06)] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <img src="/logo.png" alt="Muscle Mantra" className="w-8 h-8 object-contain" />
+                  <div className="leading-none">
+                    <div className="text-[11px] font-black text-white">ADMIN PANEL</div>
+                    <div className="text-[9px] text-[rgba(245,245,245,0.4)]">MUSCLE MANTRA</div>
+                  </div>
+                </div>
+                <button onClick={() => setMobileMenuOpen(false)} aria-label="Close menu"
+                  className="p-2 -mr-2 text-[rgba(245,245,245,0.5)] hover:text-white transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <nav className="flex-1 py-2 overflow-y-auto">
+                {sidebarItems.filter(item => owner || !item.ownerOnly).map(item => (
+                  <button key={item.id} onClick={() => { setActiveSection(item.id); setMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 text-sm transition-all relative ${activeSection === item.id ? 'bg-[rgba(255,107,0,0.1)] text-white border-l-2 border-[#FF6B00]' : 'text-[rgba(245,245,245,0.6)] hover:text-white hover:bg-white/5'}`}>
+                    <item.icon size={17} className={activeSection === item.id ? 'text-[#FF6B00]' : ''} />
+                    <span className="font-medium">{item.label}</span>
+                    {(() => {
+                      const n =
+                        item.id === 'orders'
+                          ? orderList.filter(o => !['Delivered', 'Cancelled', 'Returned'].includes(o.status)).length
+                          : item.id === 'support'
+                          ? ticketList.filter(t => t.status === 'open').length
+                          : 0;
+                      return n > 0 ? (
+                        <span className="ml-auto bg-[#FF6B00] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                          {n}
+                        </span>
+                      ) : null;
+                    })()}
+                  </button>
+                ))}
+              </nav>
+
+              <div className="p-3 border-t border-[rgba(255,255,255,0.06)]">
+                <a href="/delivery" target="_blank" rel="noreferrer"
+                  className="w-full flex items-center gap-3 px-3 py-3 text-sm text-[rgba(245,245,245,0.6)] hover:text-[#FF6B00] transition-all rounded-lg hover:bg-[rgba(255,107,0,0.08)]">
+                  <Truck size={16} />
+                  <span>Delivery Panel</span>
+                </a>
+                <button onClick={() => { signOutAdmin(); window.location.reload(); }}
+                  className="w-full flex items-center gap-3 px-3 py-3 text-sm text-[rgba(245,245,245,0.5)] hover:text-red-400 transition-all rounded-lg hover:bg-red-500/5">
+                  <LogOut size={16} />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Main */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto min-w-0">
         {/* Top bar */}
-        <div className="sticky top-0 z-10 bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)] px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-2 text-[rgba(245,245,245,0.4)] hover:text-white transition-colors">
+        <div className="sticky top-0 z-30 bg-[#0a0a0a] border-b border-[rgba(255,255,255,0.06)] px-3 sm:px-6 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 sm:gap-3 min-w-0">
+            <button onClick={() => setMobileMenuOpen(true)} aria-label="Open menu"
+              className="lg:hidden p-2 -ml-1 text-white hover:text-[#FF6B00] transition-colors shrink-0">
+              <Menu size={20} />
+            </button>
+            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="hidden lg:block p-2 text-[rgba(245,245,245,0.4)] hover:text-white transition-colors">
               <LayoutDashboard size={16} />
             </button>
-            <h1 className="font-[var(--font-montserrat)] font-black text-base text-white">
+            <h1 className="font-[var(--font-montserrat)] font-black text-sm sm:text-base text-white truncate">
               {sidebarItems.find(s => s.id === activeSection)?.label || 'Dashboard'}
             </h1>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-[rgba(245,245,245,0.4)]">15 May, 2024</span>
-            <div className="flex items-center gap-2 pl-3 border-l border-[rgba(255,255,255,0.08)]">
-              <div className="w-7 h-7 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-xs font-black">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <span className="hidden sm:inline text-xs text-[rgba(245,245,245,0.4)]">15 May, 2024</span>
+            <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-[rgba(255,255,255,0.08)]">
+              <div className="w-7 h-7 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-xs font-black shrink-0">
                 {adminEmail[0]?.toUpperCase() ?? 'A'}
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <div className="text-[11px] text-white font-semibold leading-none">Admin</div>
                 <div className="text-[9px] text-[rgba(245,245,245,0.4)] max-w-[120px] truncate">{adminEmail}</div>
               </div>
@@ -1591,7 +1673,7 @@ function AdminDashboard() {
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
           {/* DASHBOARD */}
           {activeSection === 'dashboard' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
@@ -2954,21 +3036,30 @@ function AdminDashboard() {
                   <input ref={productImgRef} type="file" accept="image/*" multiple className="hidden"
                     onChange={e => onProductImagesPick(e.target.files)} />
 
-                  {/* URL fallback */}
+                  {/* URL fallback — works without needing the Enter key (mobile-friendly):
+                      auto-adds on blur/tap-away, Enter also works on desktop, and there's
+                      an explicit Add button for a tap-to-add flow on mobile. */}
                   <div className="mt-3 flex gap-2">
-                    <input placeholder="…or paste an image URL (https://…)"
+                    <input
+                      value={imageUrlInput}
+                      onChange={e => setImageUrlInput(e.target.value)}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
-                          const val = (e.target as HTMLInputElement).value.trim();
-                          if (val) {
-                            setProductDraft(d => d ? { ...d, images: [...d.images, val].slice(0, 6) } : d);
-                            (e.target as HTMLInputElement).value = '';
-                          }
+                          e.preventDefault();
+                          addImageUrlToDraft(imageUrlInput);
                         }
                       }}
-                      className="flex-1 px-3 py-2 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-lg text-[13px] text-white placeholder:text-[rgba(245,245,245,0.3)] focus:border-[#FF6B00] focus:outline-none" />
-                    <span className="text-[10px] text-[rgba(245,245,245,0.4)] self-center">press Enter to add</span>
+                      onBlur={() => addImageUrlToDraft(imageUrlInput)}
+                      inputMode="url"
+                      enterKeyHint="done"
+                      placeholder="…or paste an image URL (https://…)"
+                      className="flex-1 min-w-0 px-3 py-2 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-lg text-[13px] text-white placeholder:text-[rgba(245,245,245,0.3)] focus:border-[#FF6B00] focus:outline-none" />
+                    <button type="button" onClick={() => addImageUrlToDraft(imageUrlInput)}
+                      className="shrink-0 px-4 py-2 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-[12px] font-bold rounded-lg transition-all">
+                      Add
+                    </button>
                   </div>
+                  <p className="text-[10px] text-[rgba(245,245,245,0.4)] mt-1.5">Paste the link, then tap Add (or just tap outside the box) — it&apos;s added automatically.</p>
                 </section>
 
                 {/* Basic info */}
