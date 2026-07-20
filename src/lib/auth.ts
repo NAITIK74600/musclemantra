@@ -7,7 +7,12 @@
 
 const TOKEN_KEY = 'mb_token_v3';
 const USER_KEY  = 'mb_user_v3';
+const EXP_KEY   = 'mb_session_exp_v3';
 const EVENT     = 'mb-auth-change';
+
+// Client-side session window. Must stay in sync with the server token TTL
+// (see newToken() in public/api/db.php, which expires sessions after 6 hours).
+const SESSION_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 export type User = {
   id: string;
@@ -31,6 +36,7 @@ function saveSession(token: string, user: User): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.setItem(EXP_KEY, String(Date.now() + SESSION_MS));
   broadcast();
 }
 
@@ -38,7 +44,15 @@ function clearSession(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(EXP_KEY);
   broadcast();
+}
+
+/** True once the 6-hour session window has elapsed. */
+function isExpired(): boolean {
+  if (typeof window === 'undefined') return false;
+  const exp = Number(localStorage.getItem(EXP_KEY) || 0);
+  return exp > 0 && Date.now() > exp;
 }
 
 function broadcast(): void {
@@ -50,6 +64,7 @@ function broadcast(): void {
 export function getCurrentUser(): User | null {
   if (typeof window === 'undefined') return null;
   if (!getToken()) return null;
+  if (isExpired()) { clearSession(); return null; }
   try {
     const raw = localStorage.getItem(USER_KEY);
     return raw ? (JSON.parse(raw) as User) : null;
@@ -149,6 +164,7 @@ export function signOut(): void {
 export async function refreshUser(): Promise<User | null> {
   const token = getToken();
   if (!token) return null;
+  if (isExpired()) { signOut(); return null; }
   try {
     const res = await fetch('/api/auth/me', {
       headers: { Authorization: `Bearer ${token}` },
@@ -160,6 +176,49 @@ export async function refreshUser(): Promise<User | null> {
   } catch {
     return getCurrentUser();
   }
+}
+
+/**
+ * Enforce the 6-hour session limit. Signs the user out once the window
+ * elapses, and re-checks whenever the tab regains focus — so an app left
+ * open in a background tab is logged out on return. Call once on app mount;
+ * returns a cleanup fn.
+ */
+export function startSessionWatch(): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  const enforce = () => {
+    if (localStorage.getItem(TOKEN_KEY) && isExpired()) signOut();
+  };
+
+  // Periodic check while the tab is active.
+  const timer = window.setInterval(enforce, 60 * 1000);
+
+  // When the tab returns to the foreground: log out if expired, else re-validate.
+  const onForeground = () => {
+    if (document.visibilityState !== 'visible') return;
+    if (localStorage.getItem(TOKEN_KEY) && isExpired()) { signOut(); return; }
+    if (getToken()) void refreshUser();
+  };
+  document.addEventListener('visibilitychange', onForeground);
+  window.addEventListener('focus', onForeground);
+
+  // Cross-tab sync: mirror a login/logout that happened in another tab.
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === TOKEN_KEY || e.key === EXP_KEY) broadcast();
+  };
+  window.addEventListener('storage', onStorage);
+
+  // Initial run on mount.
+  enforce();
+  if (getToken()) void refreshUser();
+
+  return () => {
+    window.clearInterval(timer);
+    document.removeEventListener('visibilitychange', onForeground);
+    window.removeEventListener('focus', onForeground);
+    window.removeEventListener('storage', onStorage);
+  };
 }
 
 export async function updateProfile(

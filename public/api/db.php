@@ -97,7 +97,8 @@ function requireAdmin(): array {
 
 function newToken(string $userId): string {
     $token   = bin2hex(random_bytes(32));
-    $expires = date('Y-m-d H:i:s', strtotime('+30 days'));
+    // Sessions live for 6 hours only — after that the user must sign in again.
+    $expires = date('Y-m-d H:i:s', strtotime('+6 hours'));
     getDB()->prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?,?,?)')
            ->execute([$token, $userId, $expires]);
     return $token;

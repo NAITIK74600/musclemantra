@@ -5,6 +5,7 @@ import ConditionalChrome from "@/components/ConditionalChrome";
 import CartProvider from "@/components/CartProvider";
 import ToastProvider from "@/components/ToastProvider";
 import GoogleAuthProvider from "@/components/GoogleAuthProvider";
+import SessionGuard from "@/components/SessionGuard";
 import Analytics from "@/components/Analytics";
 
 const montserrat = Montserrat({
@@ -158,6 +159,7 @@ export default function RootLayout({
         </noscript>
         <Analytics />
         <GoogleAuthProvider>
+          <SessionGuard />
           <ToastProvider>
             <CartProvider>
               <ConditionalChrome>{children}</ConditionalChrome>
