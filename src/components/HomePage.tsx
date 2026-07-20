@@ -68,7 +68,7 @@ function ClientMotion({
   );
 }
 
-/** Unified section heading â€” eyebrow + title + optional link, for visual rhythm */
+/** Unified section heading — eyebrow + title + optional link, for visual rhythm */
 function SectionHeader({
   eyebrow, title, accent, href, linkLabel = 'View all',
 }: { eyebrow?: string; title: string; accent?: string; href?: string; linkLabel?: string }) {
@@ -117,7 +117,7 @@ function HeroSection() {
           style={{ opacity: i === activeIdx ? 1 : 0, backgroundImage: `url('${src}')`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
       ))}
 
-      {/* Legibility gradient â€” strong on the left, image clear on the right */}
+      {/* Legibility gradient — strong on the left, image clear on the right */}
       <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(5,5,5,0.94) 0%, rgba(5,5,5,0.8) 40%, rgba(5,5,5,0.28) 66%, transparent 82%)' }} />
       {/* Mobile bottom-heavy vignette so text sits over darker area */}
       <div className="absolute inset-0 md:hidden" style={{ background: 'linear-gradient(to bottom, rgba(5,5,5,0.55) 0%, rgba(5,5,5,0.4) 40%, rgba(5,5,5,0.85) 100%)' }} />
@@ -192,9 +192,7 @@ function HeroSection() {
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   TRUST STRIP  (social proof â€” placed directly under hero)
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* TRUST STRIP — social proof under hero */
 function TrustStrip() {
   const items = [
     { icon: Shield, title: '100% Authentic', sub: 'Sourced directly from brands' },
@@ -289,9 +287,7 @@ function CategoriesSection() {
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   FLASH DEALS
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* FLASH DEALS */
 function useCountdown(targetSecs: number) {
   const [secs, setSecs] = useState(targetSecs);
   useEffect(() => {
@@ -389,9 +385,7 @@ function BestsellersSection() {
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   TOP BRANDS  (clean, professional carousel)
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* TOP BRANDS — carousel */
 function TopBrandsSection() {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
@@ -481,13 +475,11 @@ function TopBrandsSection() {
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   WHY CHOOSE US  (value proposition + stats)
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* WHY CHOOSE US — value proposition + stats */
 function WhyChooseUs() {
   const points = [
     { icon: Shield, title: 'Lab-Verified Authenticity', desc: 'Every product is sourced directly from authorised distributors and scan-verified for genuineness.' },
-    { icon: Truck, title: 'Lightning-Fast Delivery', desc: 'Get your supplements delivered across Patna in as little as 30 minutes â€” no long waits.' },
+    { icon: Truck, title: 'Fast Doorstep Delivery', desc: 'Quick, reliable dispatch with fast doorstep delivery across India — no long waits.' },
     { icon: Award, title: 'Expert-Curated Range', desc: 'Hand-picked products and stacks recommended by certified nutritionists and trainers.' },
   ];
   return (
@@ -515,9 +507,7 @@ function WhyChooseUs() {
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   NEWSLETTER CTA BAND
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* NEWSLETTER CTA BAND */
 function NewsletterBand() {
   const { push } = useToast();
   const [email, setEmail] = useState('');
@@ -532,7 +522,7 @@ function NewsletterBand() {
       return;
     }
     setBusy(true);
-    // Simulate signup â€” front-end demo only.
+    // Simulate signup — front-end demo only.
     setTimeout(() => {
       setBusy(false);
       setEmail('');
@@ -588,9 +578,7 @@ function NewsletterBand() {
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   PROMO BANNERS  (admin-managed photo / video)
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* PROMO BANNERS — admin-managed photo / video */
 function PromoBanner() {
   const [promos, setPromos] = useState<Promo[]>(defaultPromos);
 
@@ -637,9 +625,7 @@ function PromoBanner() {
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   TESTIMONIALS  (removed â€” no fabricated customer quotes)
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* TESTIMONIALS — removed (no fabricated customer quotes) */
 
 /* ─────────────────────────────────────────────────────────────
    PAGE
