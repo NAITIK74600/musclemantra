@@ -60,6 +60,45 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-red-500/15 text-red-400 border-red-500/20',
 };
 
+// ── Order fulfilment progression ──────────────────────────────────────────
+// Orders move FORWARD only, one stage at a time. Admin can never send an order
+// back to an earlier stage (no reverse). Cancelling is allowed only before the
+// parcel ships; a Return is allowed only after delivery.
+const ORDER_STATUS_OPTIONS = [
+  'Confirmed — Pay on Delivery', 'Payment Pending', 'Payment Received',
+  'Processing', 'Packed', 'Shipped', 'Out for Delivery', 'Delivered',
+  'Cancelled', 'Returned',
+];
+
+// Rank = position in the delivery journey. Equal ranks are alternative states
+// for the same stage (e.g. COD "Confirmed" vs online "Payment Received").
+const STATUS_RANK: Record<string, number> = {
+  'Payment Pending': 0,
+  'Payment Failed': 0,
+  'Confirmed — Pay on Delivery': 1,
+  'Payment Received': 1,
+  'Processing': 2,
+  'Packed': 3,
+  'Shipped': 4,
+  'Out for Delivery': 5,
+  'Delivered': 6,
+  'Returned': 7,
+  'Cancelled': 99, // terminal
+};
+
+// Can an order move FROM one status TO another? Forward-only, no reverse.
+function canTransition(from: string, to: string): boolean {
+  if (from === to) return true;
+  if (from === 'Cancelled' || from === 'Returned') return false; // terminal
+  if (from === 'Delivered') return to === 'Returned';            // only returns after delivery
+  const rf = STATUS_RANK[from] ?? 0;
+  if (to === 'Cancelled') return rf < STATUS_RANK['Shipped'];    // cancel only before it ships
+  if (to === 'Returned') return false;                           // returns only from Delivered
+  const rt = STATUS_RANK[to] ?? 0;
+  return rt > rf;                                                // strictly forward
+}
+
+
 // Simple bar chart using divs
 const chartData = [
   { day: 'Mon', val: 65 }, { day: 'Tue', val: 82 }, { day: 'Wed', val: 54 },
@@ -724,24 +763,38 @@ function AdminDashboard() {
 
   const updateOrderStatus = useCallback(async (id: string, status: string) => {
     const current = orderList.find(o => o.id === id);
-    // A delivered order was already received by the customer — it can't be
-    // "cancelled". Use "Returned" instead for post-delivery issues.
-    if (current?.status === 'Delivered' && status === 'Cancelled') {
+    if (!current) return;
+    if (current.status === status) return;
+
+    // Forward-only guard: an order can never move back to an earlier stage.
+    if (!canTransition(current.status, status)) {
       toast.push({
         variant: 'error',
-        title: 'Delivered order can’t be cancelled',
-        description: 'The customer already received this order. Mark it “Returned” instead.',
+        title: 'Not allowed',
+        description: `“${current.status}” can’t be changed to “${status}”. Orders only move forward.`,
       });
       return;
     }
-    await fetch('/api/update-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
-      body: JSON.stringify({ id, status }),
-    });
-    setOrderList(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-    toast.push({ variant: 'success', title: `Order updated: ${status}` });
-  }, [ADMIN_KEY_VAL, orderList, toast]);
+
+    try {
+      const res = await fetch('/api/update-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
+        body: JSON.stringify({ id, status }),
+      });
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) {
+        toast.push({ variant: 'error', title: 'Could not update order', description: data?.error || `HTTP ${res.status}` });
+        fetchOrders(); // re-sync so the dropdown shows the true saved status
+        return;
+      }
+      setOrderList(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+      toast.push({ variant: 'success', title: `Order updated: ${status}` });
+    } catch {
+      toast.push({ variant: 'error', title: 'Network error', description: 'Could not reach the server. Please retry.' });
+      fetchOrders();
+    }
+  }, [ADMIN_KEY_VAL, orderList, toast, fetchOrders]);
 
   const resendOrderEmail = useCallback(async (id: string) => {
     toast.push({ variant: 'info', title: `Resending email for #${id}…` });
@@ -1770,8 +1823,10 @@ function AdminDashboard() {
                             <select value={o.status}
                               onChange={e => updateOrderStatus(o.id, e.target.value)}
                               className="bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-lg px-2 py-1 text-[11px] text-white focus:border-[#FF6B00] focus:outline-none">
-                              {['Confirmed — Pay on Delivery','Payment Pending','Payment Received','Processing','Packed','Shipped','Out for Delivery','Delivered','Cancelled','Returned'].map(s => (
-                                <option key={s} value={s}>{s}</option>
+                              {ORDER_STATUS_OPTIONS.map(s => (
+                                <option key={s} value={s} disabled={!canTransition(o.status, s)}>
+                                  {s}{!canTransition(o.status, s) && s !== o.status ? ' 🔒' : ''}
+                                </option>
                               ))}
                             </select>
                           </td>

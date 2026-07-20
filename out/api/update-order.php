@@ -17,6 +17,33 @@ $chk->execute([$id]);
 $order = $chk->fetch();
 if (!$order) fail("Order not found", 404);
 
+$currentStatus = (string)($order["status"] ?? "");
+
+// ── Forward-only progression guard ────────────────────────────────────────
+// Orders move forward through the delivery journey; they can never be sent
+// back to an earlier stage. Cancel is allowed only before the parcel ships;
+// a Return is allowed only after delivery.
+$RANK = [
+    'Payment Pending' => 0, 'Payment Failed' => 0,
+    'Confirmed — Pay on Delivery' => 1, 'Payment Received' => 1,
+    'Processing' => 2, 'Packed' => 3, 'Shipped' => 4,
+    'Out for Delivery' => 5, 'Delivered' => 6, 'Returned' => 7,
+    'Cancelled' => 99,
+];
+$canMove = function (string $from, string $to) use ($RANK): bool {
+    if ($from === $to) return true;
+    if ($from === 'Cancelled' || $from === 'Returned') return false;
+    if ($from === 'Delivered') return $to === 'Returned';
+    $rf = $RANK[$from] ?? 0;
+    if ($to === 'Cancelled') return $rf < ($RANK['Shipped'] ?? 4);
+    if ($to === 'Returned') return false;
+    return ($RANK[$to] ?? 0) > $rf;
+};
+
+if ($currentStatus !== "" && !$canMove($currentStatus, $status)) {
+    fail("Orders can only move forward — can't change \"$currentStatus\" to \"$status\".", 409);
+}
+
 // A delivered order was already received — it cannot be cancelled.
 // Use "Returned" for post-delivery issues instead.
 if (($order["status"] ?? "") === "Delivered" && $status === "Cancelled") {
