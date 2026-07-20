@@ -193,12 +193,12 @@ function ProductDetailInner({ product, catalogue }: { product: AdminProduct; cat
       </div>
 
       <div className="container-max py-6 lg:py-10">
-        <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-8 lg:gap-14 mb-14 lg:mb-20">
+        <div className="grid sm:grid-cols-[280px_1fr] md:grid-cols-[340px_1fr] lg:grid-cols-[400px_1fr] xl:grid-cols-[440px_1fr] gap-6 sm:gap-8 lg:gap-12 mb-12 lg:mb-20">
           {/* Gallery */}
           <motion.div
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: [0.25, 0.1, 0.25, 1] }}
-            className="lg:sticky lg:top-28 lg:self-start space-y-3"
+            className="space-y-3 mx-auto sm:mx-0 max-w-[420px] sm:max-w-none w-full"
           >
             <div className="relative aspect-square rounded-2xl overflow-hidden bg-[#111] border border-[rgba(255,255,255,0.08)] group">
               <AnimatePresence mode="wait">
@@ -214,7 +214,7 @@ function ProductDetailInner({ product, catalogue }: { product: AdminProduct; cat
                   >
                     <Image src={primaryImage} alt={product.name} fill priority
                       className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-                      sizes="(max-width: 1024px) 100vw, 50vw" unoptimized={primaryImage.startsWith('data:')} />
+                      sizes="(max-width: 640px) 90vw, 440px" unoptimized={primaryImage.startsWith('data:')} />
                   </motion.button>
                 )}
               </AnimatePresence>
@@ -234,18 +234,6 @@ function ProductDetailInner({ product, catalogue }: { product: AdminProduct; cat
                   -{product.discount}%
                 </div>
               )}
-
-              {/* Floating actions */}
-              <div className="absolute bottom-4 right-4 flex gap-2 z-10">
-                <button onClick={handleShare} type="button" aria-label="Share product"
-                  className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white hover:bg-black/80 transition-colors">
-                  <Share2 size={15} />
-                </button>
-                <button onClick={handleWish} type="button" aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}
-                  className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-black/80 transition-colors">
-                  <Heart size={15} className={wished ? 'text-[#FF6B00] fill-[#FF6B00]' : 'text-white'} />
-                </button>
-              </div>
 
               {gallery.length > 1 && (
                 <div className="absolute bottom-4 left-4 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm text-[11px] font-semibold text-white z-10">
@@ -380,9 +368,15 @@ function ProductDetailInner({ product, catalogue }: { product: AdminProduct; cat
                 className="flex-1 flex items-center justify-center gap-2 py-3.5 font-bold rounded-xl transition-all duration-300 text-base bg-[#FF6B00] hover:bg-[#E55A00] text-white hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] disabled:opacity-40 disabled:cursor-not-allowed">
                 <Zap size={18} /> Buy Now
               </motion.button>
+            </div>
+            <div className="flex items-center gap-3">
               <button onClick={handleWish} type="button" aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}
-                className={`p-3.5 rounded-xl border transition-all ${wished ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-[#111] border-[rgba(255,255,255,0.1)] text-[rgba(245,245,245,0.5)] hover:border-[rgba(255,107,0,0.3)]'}`}>
-                <Heart size={18} className={wished ? 'fill-red-400' : ''} />
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${wished ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-[#111] border-[rgba(255,255,255,0.1)] text-[rgba(245,245,245,0.6)] hover:border-[rgba(255,107,0,0.3)]'}`}>
+                <Heart size={16} className={wished ? 'fill-red-400' : ''} /> {wished ? 'Saved' : 'Wishlist'}
+              </button>
+              <button onClick={handleShare} type="button" aria-label="Share product"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[rgba(255,255,255,0.1)] bg-[#111] text-sm font-semibold text-[rgba(245,245,245,0.6)] hover:border-[rgba(255,107,0,0.3)] hover:text-white transition-all">
+                <Share2 size={16} /> Share
               </button>
             </div>
 
