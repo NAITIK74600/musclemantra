@@ -22,6 +22,9 @@ import {
   getCategories, saveCategories, addCategory, updateCategory, deleteCategory, type AdminCategory,
   getTrainers, addTrainer, updateTrainer, deleteTrainer, type Trainer,
   getPlans, addPlan, updatePlan, deletePlan, type TrainingPlan,
+  syncProductsForAdmin, syncCategoriesFromServer,
+  createProductServer, updateProductServer, deleteProductServer,
+  saveCategoryServer, deleteCategoryServer, uploadImageToServer,
 } from '@/lib/store';
 import { parseCSV, toCSV, downloadCSV } from '@/lib/csv';
 import { useToast } from '@/components/ToastProvider';
@@ -887,12 +890,17 @@ function AdminDashboard() {
     setPromoList(getPromos());
     setProductList(getProducts());
     setCategoryList(getCategories());
-    return onStoreChange(() => {
+    const off = onStoreChange(() => {
       setBrandList(getBrands());
       setPromoList(getPromos());
       setProductList(getProducts());
       setCategoryList(getCategories());
     });
+    // Pull the live server catalogue (incl. hidden products) so the admin always
+    // edits the real data — not a stale local copy from another device.
+    void syncProductsForAdmin();
+    void syncCategoriesFromServer();
+    return off;
   }, []);
 
   // Brand form
@@ -964,8 +972,18 @@ function AdminDashboard() {
   const onProductImagesPick = async (files: FileList | null) => {
     if (!productDraft || !files || !files.length) return;
     const arr = Array.from(files).slice(0, 6);
-    const dataUrls = await Promise.all(arr.map(f => fileToDataURL(f)));
-    setProductDraft(d => d ? { ...d, images: [...d.images, ...dataUrls].slice(0, 6) } : d);
+    // Upload to the server so images get a public https URL that persists and
+    // shows on every device (base64 data-URLs are never stored server-side).
+    const urls: string[] = [];
+    for (const f of arr) {
+      const url = await uploadImageToServer(f, 'product', productDraft.id);
+      if (url) urls.push(url);
+    }
+    if (urls.length === 0) {
+      toast.push({ variant: 'error', title: 'Image upload failed', description: 'Check your connection and try again.' });
+    } else {
+      setProductDraft(d => d ? { ...d, images: [...d.images, ...urls].slice(0, 6) } : d);
+    }
     if (productImgRef.current) productImgRef.current.value = '';
   };
   const removeProductImage = (idx: number) => {
@@ -980,7 +998,7 @@ function AdminDashboard() {
     });
   };
 
-  const saveProductDraft = () => {
+  const saveProductDraft = async () => {
     if (!productDraft) return;
     if (!productDraft.name.trim()) { toast.push({ variant: 'error', title: 'Name is required' }); return; }
     if (!productDraft.images.length) { toast.push({ variant: 'error', title: 'At least one product image is required' }); return; }
@@ -990,28 +1008,43 @@ function AdminDashboard() {
       : productDraft.discount;
     const payload: AdminProduct = { ...productDraft, discount, image: productDraft.images[0] };
     if (existing) {
-      const updated = updateProduct(payload.id, payload);
-      if (updated) toast.push({ variant: 'success', title: 'Product updated', description: updated.name });
+      const serverOk = await updateProductServer(payload.id, payload);
+      updateProduct(payload.id, payload);
+      if (serverOk) { await syncProductsForAdmin(); }
+      toast.push(serverOk
+        ? { variant: 'success', title: 'Product updated', description: payload.name }
+        : { variant: 'error', title: 'Saved locally only', description: 'Server sync failed — it won’t show on other devices. Check your connection.' });
     } else {
-      const added = addProduct(payload);
-      toast.push({ variant: 'success', title: 'Product added', description: added.name });
+      const serverId = await createProductServer(payload);
+      const added = addProduct(serverId ? { ...payload, id: serverId } : payload);
+      if (serverId) { await syncProductsForAdmin(); }
+      toast.push(serverId
+        ? { variant: 'success', title: 'Product added', description: added.name }
+        : { variant: 'error', title: 'Saved locally only', description: 'Server sync failed — it won’t show on other devices. Check your admin login / connection.' });
     }
     setProductList(getProducts());
     closeProductModal();
   };
 
-  const removeProduct = (id: string) => {
+  const removeProduct = async (id: string) => {
     const p = productList.find(x => x.id === id);
+    const serverOk = await deleteProductServer(id);
     deleteProduct(id);
+    if (serverOk) { await syncProductsForAdmin(); }
     setProductList(getProducts());
-    if (p) toast.push({ variant: 'info', title: 'Product removed', description: p.name });
+    if (p) toast.push(serverOk
+      ? { variant: 'info', title: 'Product removed', description: p.name }
+      : { variant: 'error', title: 'Removed locally only', description: 'Server sync failed — check your connection.' });
   };
 
-  const toggleProductActive = (id: string) => {
+  const toggleProductActive = async (id: string) => {
     const p = productList.find(x => x.id === id);
     if (!p) return;
-    updateProduct(id, { active: !p.active });
+    const next = !p.active;
+    updateProduct(id, { active: next });
     setProductList(getProducts());
+    const serverOk = await updateProductServer(id, { active: next });
+    if (!serverOk) toast.push({ variant: 'error', title: 'Server sync failed', description: 'Visibility change didn’t reach the server.' });
   };
 
   // ── Bulk product import / export (Excel-compatible CSV) ──────────────────
@@ -1096,14 +1129,8 @@ function AdminDashboard() {
         // server-side price validation recognises this product. Falls back to
         // a local-only id if the server is unreachable.
         let serverId: string | undefined;
-        try {
-          const res = await fetch('/api/products/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY_VAL },
-            body: JSON.stringify(payload),
-          });
-          if (res.ok) { const d = await res.json().catch(() => null); serverId = d?.id ?? undefined; if (serverId) serverSynced++; }
-        } catch { /* offline / no server — local id */ }
+        const sid = await createProductServer(payload);
+        if (sid) { serverId = sid; serverSynced++; }
 
         addProduct({
           ...payload,
@@ -1118,6 +1145,9 @@ function AdminDashboard() {
         added++;
       }
 
+      // Reconcile with the server only when every row synced, so a transient
+      // failure never drops the products the admin just imported locally.
+      if (added > 0 && serverSynced === added) { await syncProductsForAdmin(); }
       setProductList(getProducts());
       toast.push({
         variant: added > 0 ? 'success' : 'error',
@@ -1152,20 +1182,24 @@ function AdminDashboard() {
 
   const onCategoryImage = async (file?: File) => {
     if (!file) return;
-    const url = await fileToDataURL(file);
-    setCategoryForm(f => ({ ...f, image: url }));
+    const url = await uploadImageToServer(file, 'category', categoryForm.id || undefined);
+    if (url) setCategoryForm(f => ({ ...f, image: url }));
+    else toast.push({ variant: 'error', title: 'Image upload failed', description: 'Check your connection and try again.' });
   };
 
-  const submitCategory = () => {
+  const submitCategory = async () => {
     if (!categoryForm.label.trim()) { toast.push({ variant: 'error', title: 'Category label required' }); return; }
+    let saved: AdminCategory | null;
     if (editingCategoryId) {
-      updateCategory(editingCategoryId, { label: categoryForm.label, icon: categoryForm.icon, color: categoryForm.color, image: categoryForm.image });
-      toast.push({ variant: 'success', title: 'Category updated' });
+      saved = updateCategory(editingCategoryId, { label: categoryForm.label, icon: categoryForm.icon, color: categoryForm.color, image: categoryForm.image });
     } else {
-      addCategory({ ...categoryForm, active: true });
-      toast.push({ variant: 'success', title: 'Category added' });
+      saved = addCategory({ ...categoryForm, active: true });
     }
     setCategoryList(getCategories());
+    const serverOk = saved ? await saveCategoryServer(saved) : false;
+    toast.push(serverOk
+      ? { variant: 'success', title: editingCategoryId ? 'Category updated' : 'Category added' }
+      : { variant: 'error', title: 'Saved locally only', description: 'Server sync failed — it won’t show on other devices.' });
     setCategoryForm({ id: '', label: '', icon: '💪', color: '#FF6B00', image: '' });
     setEditingCategoryId(null);
     if (categoryImgRef.current) categoryImgRef.current.value = '';
@@ -1179,18 +1213,22 @@ function AdminDashboard() {
     setCategoryForm({ id: '', label: '', icon: '💪', color: '#FF6B00', image: '' });
     if (categoryImgRef.current) categoryImgRef.current.value = '';
   };
-  const removeCategoryLocal = (id: string) => {
+  const removeCategoryLocal = async (id: string) => {
     const inUse = productList.some(p => p.category === id);
     if (inUse) { toast.push({ variant: 'error', title: 'Category in use', description: 'Reassign products before deleting.' }); return; }
     deleteCategory(id);
     setCategoryList(getCategories());
-    toast.push({ variant: 'info', title: 'Category removed' });
+    const serverOk = await deleteCategoryServer(id);
+    toast.push(serverOk
+      ? { variant: 'info', title: 'Category removed' }
+      : { variant: 'error', title: 'Removed locally only', description: 'Server sync failed — check your connection.' });
   };
-  const toggleCategoryActive = (id: string) => {
+  const toggleCategoryActive = async (id: string) => {
     const c = categoryList.find(x => x.id === id);
     if (!c) return;
-    updateCategory(id, { active: !c.active });
+    const updated = updateCategory(id, { active: !c.active });
     setCategoryList(getCategories());
+    if (updated) await saveCategoryServer(updated);
   };
 
   // ── Brand per-card logo edit ─────────────────────────────────────────────
@@ -1221,8 +1259,10 @@ function AdminDashboard() {
   // ── Inventory (uses product list — inline stock/reorder edit) ────────────
   const [invSearch, setInvSearch] = useState('');
   const setStock = (id: string, stock: number) => {
-    updateProduct(id, { stock: Math.max(0, Math.floor(stock)) });
+    const s = Math.max(0, Math.floor(stock));
+    updateProduct(id, { stock: s });
     setProductList(getProducts());
+    void updateProductServer(id, { stock: s });
   };
   const setReorder = (id: string, reorderAt: number) => {
     updateProduct(id, { reorderAt: Math.max(0, Math.floor(reorderAt)) });

@@ -10,6 +10,7 @@
 
 import { sanitizeImageUrl } from './security';
 import { products as defaultProductsSeed, categories as defaultCategoriesSeed, type Product } from './data';
+import { getAdminToken } from './adminAuth';
 
 export type Brand = { id: string; name: string; short: string; logo?: string };
 export type Promo = {
@@ -520,4 +521,204 @@ export const toggleWishlist = (id: string): boolean => {
 export const removeWishlist = (id: string) => {
   write(WISHLIST_KEY, getWishlist().filter(x => x !== id));
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Server sync — the DB is the single source of truth so every device / customer
+// sees the same live catalogue. These helpers fetch from the PHP API and write
+// into the local cache (which fires `mb-store-change`, so open pages refresh).
+// Admin writes go through the bearer-token endpoints below.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Auth headers for admin write calls (bearer session token from the admin panel). */
+function adminHeaders(json = true): Record<string, string> {
+  const h: Record<string, string> = {};
+  if (json) h['Content-Type'] = 'application/json';
+  const t = getAdminToken();
+  if (t) h['Authorization'] = `Bearer ${t}`;
+  return h;
+}
+
+function mapServerProduct(r: Record<string, unknown>): AdminProduct {
+  const imgs = Array.isArray(r.images) ? (r.images as unknown[]).map(String).filter(Boolean) : [];
+  const image = String(r.image ?? r.image_url ?? '') || imgs[0] || '';
+  return sanitizeAdminProduct({
+    id: String(r.id ?? ''),
+    name: String(r.name ?? ''),
+    brand: String(r.brand ?? ''),
+    category: String(r.category ?? ''),
+    price: Number(r.price) || 0,
+    originalPrice: Number(r.originalPrice ?? r.original_price) || 0,
+    discount: Number(r.discount) || 0,
+    rating: Number(r.rating) || 0,
+    reviews: Number(r.reviews ?? r.review_count) || 0,
+    image,
+    images: imgs.length ? imgs : (image ? [image] : []),
+    flavors: Array.isArray(r.flavors) ? (r.flavors as string[]) : [],
+    sizes: Array.isArray(r.sizes) ? (r.sizes as string[]) : [],
+    tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
+    badge: (r.badge as AdminProduct['badge']) || undefined,
+    deliveryTime: String(r.deliveryTime ?? r.delivery_time ?? '1-2 days'),
+    stock: Number(r.stock) || 0,
+    description: String(r.description ?? ''),
+    sku: String(r.sku ?? ''),
+    reorderAt: Number(r.reorderAt ?? r.reorder_at ?? 20) || 20,
+    active: r.active !== undefined ? Boolean(r.active) : (r.is_active !== 0),
+    updatedAt: Date.now(),
+  } as AdminProduct);
+}
+
+/** Storefront sync: pull the live (active-only) catalogue into the local cache. */
+export async function syncProductsFromServer(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const res = await fetch('/api/products/list?limit=500');
+    if (!res.ok) return;
+    const data = await res.json();
+    const rows = Array.isArray(data?.products) ? data.products : [];
+    // Never wipe a good local catalogue on an empty / misconfigured server.
+    if (rows.length === 0) return;
+    write(PRODUCTS_KEY, rows.map(mapServerProduct));
+  } catch { /* offline — keep local cache */ }
+}
+
+/** Admin sync: pull ALL products (incl. hidden) using the admin bearer token. */
+export async function syncProductsForAdmin(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const res = await fetch('/api/products/list?all=1&limit=500', { headers: adminHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+    const rows = Array.isArray(data?.products) ? data.products : [];
+    if (rows.length === 0) return;
+    write(PRODUCTS_KEY, rows.map(mapServerProduct));
+  } catch { /* offline — keep local cache */ }
+}
+
+function mapServerCategory(r: Record<string, unknown>): AdminCategory {
+  return sanitizeCategory({
+    id: String(r.id ?? ''),
+    label: String(r.label ?? r.name ?? ''),
+    icon: String(r.icon ?? ''),
+    color: String(r.color ?? '#FF6B00'),
+    image: String(r.image ?? r.image_url ?? ''),
+    active: r.active !== false && r.is_active !== 0,
+  } as AdminCategory);
+}
+
+/** Pull the live category list into the local cache (fires store-change). */
+export async function syncCategoriesFromServer(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const res = await fetch('/api/categories/list');
+    if (!res.ok) return;
+    const data = await res.json();
+    const rows = Array.isArray(data?.categories) ? data.categories : [];
+    if (rows.length === 0) return;
+    write(CATEGORIES_KEY, rows.map(mapServerCategory));
+  } catch { /* offline — keep local cache */ }
+}
+
+function toServerProductPayload(p: Partial<AdminProduct>): Record<string, unknown> {
+  return {
+    name: p.name,
+    brand: p.brand,
+    category: p.category,
+    price: p.price,
+    originalPrice: p.originalPrice,
+    discount: p.discount,
+    description: p.description,
+    image: p.image ?? (p.images?.[0] ?? ''),
+    images: p.images ?? [],
+    flavors: p.flavors ?? [],
+    sizes: p.sizes ?? [],
+    tags: p.tags ?? [],
+    badge: p.badge ?? null,
+    deliveryTime: p.deliveryTime ?? '',
+    stock: p.stock ?? 0,
+  };
+}
+
+/** Create a product on the server. Returns the server-generated id, or null. */
+export async function createProductServer(p: Partial<AdminProduct>): Promise<string | null> {
+  try {
+    const res = await fetch('/api/products/create', {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify(toServerProductPayload(p)),
+    });
+    if (!res.ok) return null;
+    const d = await res.json().catch(() => null);
+    return (d?.id as string) ?? null;
+  } catch { return null; }
+}
+
+/** Push a product update to the server (only server-known fields are sent). */
+export async function updateProductServer(id: string, patch: Partial<AdminProduct>): Promise<boolean> {
+  try {
+    const payload: Record<string, unknown> = { id };
+    const keys: (keyof AdminProduct)[] = [
+      'name', 'brand', 'category', 'price', 'originalPrice', 'discount',
+      'description', 'image', 'images', 'flavors', 'sizes', 'tags',
+      'badge', 'deliveryTime', 'stock', 'rating', 'reviews',
+    ];
+    for (const k of keys) if (patch[k] !== undefined) payload[k] = patch[k];
+    if (patch.active !== undefined) payload.isActive = patch.active;
+    if (Object.keys(payload).length === 1) return true; // nothing server-relevant changed
+    const res = await fetch('/api/products/update', {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify(payload),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+/** Soft-delete a product on the server (keeps order history intact). */
+export async function deleteProductServer(id: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/products/delete', {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify({ id }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+/** Upsert a category on the server. */
+export async function saveCategoryServer(c: Partial<AdminCategory>): Promise<boolean> {
+  try {
+    const res = await fetch('/api/categories/save', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({
+        id: c.id, label: c.label, icon: c.icon, color: c.color,
+        image: c.image ?? '', active: c.active !== false,
+      }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+/** Delete a category on the server. */
+export async function deleteCategoryServer(id: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/categories/delete', {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify({ id }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+/**
+ * Upload an image file to the server and return its public https URL (or null).
+ * Used for product + category images so they persist and sync across devices —
+ * base64 data-URLs are never stored server-side.
+ */
+export async function uploadImageToServer(file: File, type = 'product', entityId?: string): Promise<string | null> {
+  try {
+    const fd = new FormData();
+    fd.append('image', file);
+    fd.append('type', type);
+    if (entityId) fd.append('entity_id', entityId);
+    const res = await fetch('/api/images/upload', { method: 'POST', headers: adminHeaders(false), body: fd });
+    if (!res.ok) return null;
+    const d = await res.json().catch(() => null);
+    return (d?.url as string) ?? null;
+  } catch { return null; }
+}
+
 

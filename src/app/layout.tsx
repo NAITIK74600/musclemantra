@@ -6,6 +6,7 @@ import CartProvider from "@/components/CartProvider";
 import ToastProvider from "@/components/ToastProvider";
 import GoogleAuthProvider from "@/components/GoogleAuthProvider";
 import SessionGuard from "@/components/SessionGuard";
+import StoreSync from "@/components/StoreSync";
 import Analytics from "@/components/Analytics";
 
 const montserrat = Montserrat({
@@ -160,6 +161,7 @@ export default function RootLayout({
         <Analytics />
         <GoogleAuthProvider>
           <SessionGuard />
+          <StoreSync />
           <ToastProvider>
             <CartProvider>
               <ConditionalChrome>{children}</ConditionalChrome>

@@ -2,7 +2,30 @@
 require_once dirname(__DIR__) . '/db.php';
 apiInit(['GET']);
 
-$where  = ['is_active = 1'];
+// Admins may request the FULL catalogue (including hidden/inactive products)
+// with ?all=1. Everyone else only ever sees active products.
+$showAll = !empty($_GET['all']);
+$isAdmin = false;
+if ($showAll) {
+    $key = $_SERVER['HTTP_X_ADMIN_KEY'] ?? '';
+    if ($key && hash_equals(ADMIN_KEY, $key)) {
+        $isAdmin = true;
+    } else {
+        $tok = bearerToken();
+        if ($tok) {
+            $sa = getDB()->prepare(
+                'SELECT u.is_admin FROM sessions s JOIN users u ON u.id = s.user_id
+                 WHERE s.token = ? AND s.expires_at > NOW() LIMIT 1'
+            );
+            $sa->execute([$tok]);
+            $ar = $sa->fetch();
+            $isAdmin = $ar && !empty($ar['is_admin']);
+        }
+    }
+}
+$includeHidden = $showAll && $isAdmin;
+
+$where  = $includeHidden ? [] : ['is_active = 1'];
 $params = [];
 
 if (!empty($_GET['category'])) { $where[] = 'category = ?'; $params[] = $_GET['category']; }
@@ -17,7 +40,8 @@ if (!empty($_GET['q'])) {
 $limit  = min((int)($_GET['limit']  ?? 100), 500);
 $offset = (int)($_GET['offset'] ?? 0);
 
-$sql = 'SELECT * FROM products WHERE ' . implode(' AND ', $where)
+$sql = 'SELECT * FROM products'
+     . ($where ? ' WHERE ' . implode(' AND ', $where) : '')
      . ' ORDER BY is_featured DESC, created_at DESC LIMIT ? OFFSET ?';
 $params[] = $limit;
 $params[] = $offset;
@@ -40,6 +64,7 @@ function normaliseProduct(array &$r): void {
     $r['rating']       = (float)$r['rating'];
     $r['reviews']      = (int)$r['review_count'];
     $r['stock']        = (int)$r['stock'];
+    $r['active']       = (int)($r['is_active'] ?? 1) === 1;
     $r['image']        = $r['image_url']     ?? '';
     $r['deliveryTime'] = $r['delivery_time'] ?? '30 min';
     unset($r['image_url'], $r['original_price'], $r['review_count'],
