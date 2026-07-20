@@ -7,16 +7,21 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Star, ShoppingCart, Heart, Clock, Shield, ChevronRight, Minus, Plus, Check, Truck, RotateCcw } from 'lucide-react';
-import { getProducts, onStoreChange, type AdminProduct } from '@/lib/store';
+import { getProducts, onStoreChange, syncProductsFromServer, type AdminProduct } from '@/lib/store';
 import { useCart } from '@/components/CartProvider';
 import ProductCard from '@/components/ProductCard';
 
 export default function ProductDetailClient() {
   const { id } = useParams<{ id: string }>();
   const [catalogue, setCatalogue] = useState<AdminProduct[] | null>(null);
+  const [synced, setSynced] = useState(false);
   useEffect(() => {
     setCatalogue(getProducts());
-    return onStoreChange(() => setCatalogue(getProducts()));
+    const unsub = onStoreChange(() => setCatalogue(getProducts()));
+    // Always pull the live catalogue so direct visits, fresh browsers and
+    // CSV-imported products (which aren't in the local seed defaults) resolve.
+    void syncProductsFromServer().finally(() => setSynced(true));
+    return unsub;
   }, []);
 
   const product = useMemo(
@@ -24,9 +29,10 @@ export default function ProductDetailClient() {
     [catalogue, id],
   );
 
-  // First render — store hasn't loaded yet. Show a lightweight skeleton so we
-  // don't flash a "not found" for products that legitimately exist.
-  if (catalogue === null) {
+  // Show a lightweight skeleton until the store has loaded AND the live sync
+  // has finished. This avoids flashing "not found" for products that exist on
+  // the server but aren't yet in the local cache (e.g. CSV-imported items).
+  if (catalogue === null || (!product && !synced)) {
     return (
       <div className="min-h-screen bg-[#050505]">
         <div className="container-max py-16">
