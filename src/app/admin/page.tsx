@@ -1089,13 +1089,12 @@ function AdminDashboard() {
     downloadCSV(`products-${new Date().toISOString().slice(0, 10)}.csv`, toCSV(PRODUCT_CSV_HEADERS, rows));
   };
 
-  const resolveCategory = (raw: string): string => {
-    const v = raw.trim().toLowerCase();
-    if (!v) return categoryList[0]?.id ?? 'protein';
-    const match = categoryList.find(c => c.id.toLowerCase() === v || c.label.toLowerCase() === v);
-    return match ? match.id : (categoryList[0]?.id ?? v);
-  };
   const splitMulti = (s: string): string[] => (s ?? '').split(/[|,]/).map(x => x.trim()).filter(Boolean);
+  const slugify = (s: string): string =>
+    s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  const titleCase = (s: string): string => s.trim().replace(/\b\w/g, ch => ch.toUpperCase()).slice(0, 60);
+  const brandShort = (name: string): string =>
+    (name.replace(/[^A-Za-z0-9\s]/g, '').split(/\s+/).map(w => w[0] ?? '').join('') || name).slice(0, 3).toUpperCase();
 
   const handleCsvImport = async (file: File | null) => {
     if (!file) return;
@@ -1105,6 +1104,39 @@ function AdminDashboard() {
       const rows = parseCSV(await file.text());
       if (rows.length === 0) { toast.push({ variant: 'error', title: 'CSV is empty' }); setImporting(false); return; }
       if (rows.length > 500) { toast.push({ variant: 'error', title: 'Too many rows', description: 'Max 500 products per import.' }); setImporting(false); return; }
+
+      // ── Pre-pass: register any new brands / categories the CSV introduces so
+      // they show up in the storefront filters, the /brands page and /products
+      // categories — not just silently fall back to an existing one. ──
+      const brandsWorking = getBrands();
+      const catsWorking = getCategories();
+      const newCats: AdminCategory[] = [];
+      const catIcons = ['📦', '💊', '🔥', '⚡', '🥤', '🍫', '💪', '🧬'];
+      let newBrands = 0;
+
+      const resolveCategory = (raw: string): string => {
+        const v = raw.trim().toLowerCase();
+        if (!v) return catsWorking[0]?.id ?? 'protein';
+        const match = catsWorking.find(c => c.id.toLowerCase() === v || c.label.toLowerCase() === v);
+        if (match) return match.id;
+        // Unknown category — create it on the fly.
+        const id = slugify(raw) || ('cat-' + uid());
+        const already = catsWorking.find(c => c.id === id);
+        if (already) return already.id;
+        const cat: AdminCategory = { id, label: titleCase(raw), icon: catIcons[catsWorking.length % catIcons.length], color: '#FF6B00', active: true };
+        catsWorking.push(cat);
+        newCats.push(cat);
+        return id;
+      };
+      const resolveBrand = (raw: string): string => {
+        const name = (raw ?? '').trim();
+        if (!name) return '';
+        if (!brandsWorking.some(b => b.name.toLowerCase() === name.toLowerCase())) {
+          brandsWorking.push({ id: uid(), name: name.slice(0, 100), short: brandShort(name) });
+          newBrands++;
+        }
+        return name;
+      };
 
       for (const r of rows) {
         const name = (r.name ?? '').trim();
@@ -1118,7 +1150,7 @@ function AdminDashboard() {
 
         const payload = {
           name,
-          brand: (r.brand ?? '').trim(),
+          brand: resolveBrand(r.brand ?? ''),
           category: resolveCategory(r.category ?? ''),
           price,
           originalPrice,
@@ -1152,14 +1184,27 @@ function AdminDashboard() {
         added++;
       }
 
+      // Persist the brands / categories the CSV introduced (local + server) so
+      // every device and the live storefront see them.
+      if (newBrands > 0) { saveBrands(brandsWorking); setBrandList(getBrands()); }
+      if (newCats.length > 0) {
+        saveCategories(catsWorking);
+        for (const c of newCats) { await saveCategoryServer(c); }
+        setCategoryList(getCategories());
+      }
+
       // Reconcile with the server only when every row synced, so a transient
       // failure never drops the products the admin just imported locally.
       if (added > 0 && serverSynced === added) { await syncProductsForAdmin(); }
       setProductList(getProducts());
+      const extras = [
+        newBrands ? `${newBrands} new brand${newBrands === 1 ? '' : 's'}` : '',
+        newCats.length ? `${newCats.length} new categor${newCats.length === 1 ? 'y' : 'ies'}` : '',
+      ].filter(Boolean).join(' · ');
       toast.push({
         variant: added > 0 ? 'success' : 'error',
         title: `${added} product${added === 1 ? '' : 's'} imported`,
-        description: `${serverSynced} synced to server${failed ? ` · ${failed} skipped (missing name/price)` : ''}`,
+        description: `${serverSynced} synced to server${extras ? ` · ${extras}` : ''}${failed ? ` · ${failed} skipped (missing name/price)` : ''}`,
       });
     } catch {
       toast.push({ variant: 'error', title: 'Import failed', description: 'Could not read the CSV file.' });

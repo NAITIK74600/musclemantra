@@ -156,7 +156,7 @@ function HeroSection() {
 
             <ClientMotion as="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
               className="text-white/70 text-[14.5px] sm:text-base md:text-lg mb-6 sm:mb-7 leading-relaxed max-w-lg">
-              <strong className="text-white/90 font-semibold">Muscle Mantra</strong> is Patna&apos;s trusted online supplement store. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA — sourced directly from official brands, at unbeatable prices with fast, reliable doorstep delivery across Patna.
+              <strong className="text-white/90 font-semibold">Muscle Mantra</strong>{' '}is Patna&apos;s trusted online supplement store. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA — sourced directly from official brands, at unbeatable prices with fast, reliable doorstep delivery across Patna.
             </ClientMotion>
 
             {/* CTAs */}
