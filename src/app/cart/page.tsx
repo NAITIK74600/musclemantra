@@ -2,15 +2,28 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Minus, Plus, X, ShoppingBag, ArrowRight, Tag, Truck } from 'lucide-react';
+import { Minus, Plus, X, ShoppingBag, ArrowRight, Tag, Truck, Check } from 'lucide-react';
 import { useCart } from '@/components/CartProvider';
 
 export default function CartPage() {
-  const { items, removeItem, updateQty, totalPrice, totalItems, clearCart } = useCart();
+  const { items, removeItem, updateQty, totalPrice, totalItems, clearCart, appliedCoupon, discount, applyCoupon, removeCoupon } = useCart();
   const shipping = totalPrice >= 999 ? 0 : 99;
-  const discount = Math.floor(totalPrice * 0.05);
   const finalTotal = totalPrice + shipping - discount;
+
+  const [couponInput, setCouponInput] = useState('');
+  const [couponMsg, setCouponMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [applying, setApplying] = useState(false);
+
+  const handleApplyCoupon = async () => {
+    setApplying(true);
+    setCouponMsg(null);
+    const res = await applyCoupon(couponInput);
+    setCouponMsg({ ok: res.ok, text: res.message });
+    if (res.ok) setCouponInput('');
+    setApplying(false);
+  };
 
   if (items.length === 0) {
     return (
@@ -72,15 +85,43 @@ export default function CartPage() {
 
             {/* Coupon input */}
             <div className="p-4 bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)]">
-              <div className="flex gap-3">
-                <div className="relative flex-1">
-                  <Tag size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[rgba(245,245,245,0.4)]" />
-                  <input placeholder="Enter coupon code" className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-[rgba(245,245,245,0.3)] outline-none focus:border-[rgba(255,107,0,0.4)]" />
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 shrink-0"><Check size={16} /></span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{appliedCoupon.code} applied</p>
+                      <p className="text-xs text-emerald-400">You saved ₹{discount.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => { removeCoupon(); setCouponMsg(null); }} className="shrink-0 text-xs font-semibold text-[rgba(245,245,245,0.5)] hover:text-white transition-colors px-3 py-2">
+                    Remove
+                  </button>
                 </div>
-                <button className="px-5 py-3 bg-[rgba(255,107,0,0.1)] border border-[rgba(255,107,0,0.25)] text-[#FF6B00] font-semibold rounded-xl hover:bg-[#FF6B00] hover:text-white transition-all text-sm">
-                  Apply
-                </button>
-              </div>
+              ) : (
+                <>
+                  <div className="flex gap-3">
+                    <div className="relative flex-1">
+                      <Tag size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[rgba(245,245,245,0.4)]" />
+                      <input
+                        value={couponInput}
+                        onChange={e => setCouponInput(e.target.value.toUpperCase())}
+                        onKeyDown={e => { if (e.key === 'Enter') handleApplyCoupon(); }}
+                        placeholder="Enter coupon code"
+                        className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-[rgba(245,245,245,0.3)] outline-none focus:border-[rgba(255,107,0,0.4)] uppercase" />
+                    </div>
+                    <button
+                      onClick={handleApplyCoupon}
+                      disabled={applying || !couponInput.trim()}
+                      className="px-5 py-3 bg-[rgba(255,107,0,0.1)] border border-[rgba(255,107,0,0.25)] text-[#FF6B00] font-semibold rounded-xl hover:bg-[#FF6B00] hover:text-white transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                      {applying ? 'Checking…' : 'Apply'}
+                    </button>
+                  </div>
+                  {couponMsg && !couponMsg.ok && (
+                    <p className="text-xs text-red-400 mt-2 pl-1">{couponMsg.text}</p>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -113,10 +154,12 @@ export default function CartPage() {
                   <span>Shipping</span>
                   <span className={shipping === 0 ? 'text-emerald-400' : 'text-white'}>{shipping === 0 ? 'FREE' : `₹${shipping}`}</span>
                 </div>
-                <div className="flex justify-between text-emerald-400">
-                  <span>Member Discount (5%)</span>
-                  <span>-₹{discount.toLocaleString()}</span>
-                </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-emerald-400">
+                    <span>Coupon ({appliedCoupon?.code})</span>
+                    <span>-₹{discount.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
               
               <div className="flex justify-between font-black text-white text-lg py-4 border-t border-[rgba(255,255,255,0.08)] mb-5">

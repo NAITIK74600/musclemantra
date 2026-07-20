@@ -26,6 +26,7 @@ import {
   createProductServer, updateProductServer, deleteProductServer,
   saveCategoryServer, deleteCategoryServer, uploadImageToServer,
   syncBrandsFromServer, saveBrandServer, deleteBrandServer,
+  listCouponsServer, saveCouponServer, deleteCouponServer, type Coupon,
 } from '@/lib/store';
 import { parseCSV, toCSV, downloadCSV } from '@/lib/csv';
 import { useToast } from '@/components/ToastProvider';
@@ -134,14 +135,12 @@ const inventory = [
 // ── Customers ──────────────────────────────────────────────
 type DemoCustomer = { name: string; email: string; orders: number; spent: string; status: string; joined: string };
 type DemoVendor   = { name: string; contact: string; products: number; status: string };
-type DemoCoupon   = { code: string; desc: string; value: string; used: number; limit: number; status: string };
 type DemoReview   = { product: string; customer: string; rating: number; comment: string; status: string };
 type DemoTicket   = { id: string; customer: string; subject: string; priority: string; status: string; date: string };
 type DemoCmsPage  = { title: string; type: string; updated: string; status: string };
 
 const initialCustomers: DemoCustomer[] = [];
 const initialVendors:   DemoVendor[]   = [];
-const initialCoupons:   DemoCoupon[]   = [];
 const initialReviews:   DemoReview[]   = [];
 const initialTickets:   DemoTicket[]   = [];
 const cmsPages:         DemoCmsPage[]  = [];
@@ -643,11 +642,79 @@ function AdminDashboard() {
   // ── Demo-data sections (client-side manage / delete) ─────────────────────
   const [customerList, setCustomerList] = useState(initialCustomers);
   const [vendorList, setVendorList]     = useState(initialVendors);
-  const [couponList, setCouponList]     = useState(initialCoupons);
   const [reviewList, setReviewList]     = useState(initialReviews);
   const [ticketList, setTicketList]     = useState(initialTickets);
   const [replyTicket, setReplyTicket]   = useState<(typeof initialTickets)[number] | null>(null);
   const [replyText, setReplyText]       = useState('');
+
+  // ── Coupons (server-backed) ──────────────────────────────────────────────
+  const emptyCouponForm = {
+    id: undefined as number | undefined,
+    code: '', description: '',
+    discountType: 'percent' as 'percent' | 'flat',
+    discountValue: '', minAmount: '', maxDiscount: '',
+    usageLimit: '', expiresAt: '', active: true,
+  };
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [couponForm, setCouponForm] = useState(emptyCouponForm);
+  const [showCouponForm, setShowCouponForm] = useState(false);
+  const [savingCoupon, setSavingCoupon] = useState(false);
+
+  const loadCoupons = useCallback(async () => {
+    setCoupons(await listCouponsServer());
+  }, []);
+
+  const openNewCoupon = () => { setCouponForm(emptyCouponForm); setShowCouponForm(true); };
+  const openEditCoupon = (c: Coupon) => {
+    setCouponForm({
+      id: c.id,
+      code: c.code,
+      description: c.description ?? '',
+      discountType: c.discountType,
+      discountValue: String(c.discountValue),
+      minAmount: c.minAmount ? String(c.minAmount) : '',
+      maxDiscount: c.maxDiscount != null ? String(c.maxDiscount) : '',
+      usageLimit: c.usageLimit != null ? String(c.usageLimit) : '',
+      expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : '',
+      active: c.active,
+    });
+    setShowCouponForm(true);
+  };
+
+  const submitCoupon = async () => {
+    const code = couponForm.code.trim().toUpperCase();
+    const value = parseFloat(couponForm.discountValue);
+    if (!code) { toast.push({ variant: 'error', title: 'Enter a coupon code' }); return; }
+    if (!value || value <= 0) { toast.push({ variant: 'error', title: 'Enter a valid discount value' }); return; }
+    setSavingCoupon(true);
+    const res = await saveCouponServer({
+      id: couponForm.id,
+      code,
+      description: couponForm.description.trim(),
+      discountType: couponForm.discountType,
+      discountValue: value,
+      minAmount: couponForm.minAmount ? parseFloat(couponForm.minAmount) : 0,
+      maxDiscount: couponForm.maxDiscount ? parseFloat(couponForm.maxDiscount) : null,
+      usageLimit: couponForm.usageLimit ? parseInt(couponForm.usageLimit, 10) : null,
+      expiresAt: couponForm.expiresAt || null,
+      active: couponForm.active,
+    });
+    setSavingCoupon(false);
+    if (!res.ok) { toast.push({ variant: 'error', title: 'Could not save coupon', description: res.message }); return; }
+    toast.push({ variant: 'success', title: couponForm.id ? 'Coupon updated' : 'Coupon created' });
+    setShowCouponForm(false);
+    await loadCoupons();
+  };
+
+  const removeCoupon = async (c: Coupon) => {
+    if (!c.id) return;
+    if (!window.confirm(`Delete coupon "${c.code}"? This cannot be undone.`)) return;
+    const okDel = await deleteCouponServer(c.id);
+    if (!okDel) { toast.push({ variant: 'error', title: 'Could not delete coupon' }); return; }
+    setCoupons(prev => prev.filter(x => x.id !== c.id));
+    toast.push({ variant: 'success', title: 'Coupon deleted' });
+  };
+
   const [toggles, setToggles] = useState({
     cod: true, onlinePay: true, sameDay: true, lowStockAlerts: true, reviews: false, maintenance: false,
   });
@@ -909,6 +976,7 @@ function AdminDashboard() {
     void syncProductsForAdmin();
     void syncCategoriesFromServer();
     void syncBrandsFromServer();
+    void loadCoupons();
     return off;
   }, []);
 
@@ -1137,11 +1205,18 @@ function AdminDashboard() {
   const handleCsvImport = async (file: File | null) => {
     if (!file) return;
     setImporting(true);
-    let added = 0, failed = 0, serverSynced = 0;
+    let added = 0, updated = 0, failed = 0, serverSynced = 0;
     try {
       const rows = parseCSV(await file.text());
       if (rows.length === 0) { toast.push({ variant: 'error', title: 'CSV is empty' }); setImporting(false); return; }
       if (rows.length > 500) { toast.push({ variant: 'error', title: 'Too many rows', description: 'Max 500 products per import.' }); setImporting(false); return; }
+
+      // Pull the current server catalogue first so a re-import UPDATES matching
+      // products (same name + brand) instead of creating duplicates.
+      await syncProductsForAdmin();
+      const keyOf = (nm: string, br: string) => `${nm.trim().toLowerCase()}|${(br ?? '').trim().toLowerCase()}`;
+      const existingByKey = new Map<string, AdminProduct>();
+      for (const ep of getProducts()) existingByKey.set(keyOf(ep.name, ep.brand), ep);
 
       // ── Pre-pass: register any new brands / categories the CSV introduces so
       // they show up in the storefront filters, the /brands page and /products
@@ -1203,24 +1278,33 @@ function AdminDashboard() {
           description: (r.description ?? '').trim(),
         };
 
-        // Persist to the server products table first so the id matches and
-        // server-side price validation recognises this product. Falls back to
-        // a local-only id if the server is unreachable.
-        let serverId: string | undefined;
-        const sid = await createProductServer(payload);
-        if (sid) { serverId = sid; serverSynced++; }
-
-        addProduct({
-          ...payload,
-          id: serverId,
-          sku: '',
-          reorderAt: 20,
-          deliveryTime: '1-2 days',
-          rating: 0,
-          reviews: 0,
-          active: true,
-        });
-        added++;
+        // Upsert: if a product with the same name + brand already exists, UPDATE
+        // it (server + local) so re-imports refresh the catalogue instead of
+        // duplicating. Otherwise create a brand-new product.
+        const existing = existingByKey.get(keyOf(payload.name, payload.brand));
+        if (existing) {
+          const okS = await updateProductServer(existing.id, payload);
+          updateProduct(existing.id, payload);
+          if (okS) serverSynced++;
+          updated++;
+        } else {
+          let serverId: string | undefined;
+          const sid = await createProductServer(payload);
+          if (sid) { serverId = sid; serverSynced++; }
+          const created = addProduct({
+            ...payload,
+            id: serverId,
+            sku: '',
+            reorderAt: 20,
+            deliveryTime: '1-2 days',
+            rating: 0,
+            reviews: 0,
+            active: true,
+          });
+          // Register so duplicate rows within the SAME file update, not re-add.
+          existingByKey.set(keyOf(created.name, created.brand), created);
+          added++;
+        }
       }
 
       // Persist the brands / categories the CSV introduced (local + server) so
@@ -1238,15 +1322,16 @@ function AdminDashboard() {
 
       // Reconcile with the server only when every row synced, so a transient
       // failure never drops the products the admin just imported locally.
-      if (added > 0 && serverSynced === added) { await syncProductsForAdmin(); }
+      if ((added + updated) > 0 && serverSynced === (added + updated)) { await syncProductsForAdmin(); }
       setProductList(getProducts());
       const extras = [
+        updated ? `${updated} updated` : '',
         addedBrands.length ? `${addedBrands.length} new brand${addedBrands.length === 1 ? '' : 's'}` : '',
         newCats.length ? `${newCats.length} new categor${newCats.length === 1 ? 'y' : 'ies'}` : '',
       ].filter(Boolean).join(' · ');
       toast.push({
-        variant: added > 0 ? 'success' : 'error',
-        title: `${added} product${added === 1 ? '' : 's'} imported`,
+        variant: (added + updated) > 0 ? 'success' : 'error',
+        title: `${added} added${updated ? ` · ${updated} updated` : ''}`,
         description: `${serverSynced} synced to server${extras ? ` · ${extras}` : ''}${failed ? ` · ${failed} skipped (missing name/price)` : ''}`,
       });
     } catch {
@@ -2402,40 +2487,133 @@ function AdminDashboard() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-[var(--font-montserrat)] font-black text-xl text-white">Coupons & Discounts</h2>
-                <button className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Plus size={15} /> Create Coupon</button>
+                <button onClick={openNewCoupon} className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all"><Plus size={15} /> Create Coupon</button>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
-                {couponList.length === 0 && (
-                  <p className="sm:col-span-2 text-center text-sm text-[rgba(245,245,245,0.3)] py-12">No coupons yet.</p>
+                {coupons.length === 0 && (
+                  <p className="sm:col-span-2 text-center text-sm text-[rgba(245,245,245,0.3)] py-12">No coupons yet. Click “Create Coupon” to add one.</p>
                 )}
-                {couponList.map(c => (
-                  <div key={c.code} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-[rgba(255,107,0,0.12)] flex items-center justify-center"><Percent size={18} className="text-[#FF6B00]" /></div>
+                {coupons.map(c => {
+                  const usePct = c.usageLimit ? Math.min(Math.round((c.usedCount ?? 0) / c.usageLimit * 100), 100) : 0;
+                  const expired = c.expiresAt ? new Date(c.expiresAt).getTime() < Date.now() : false;
+                  const status = !c.active ? 'inactive' : expired ? 'expired' : 'active';
+                  return (
+                    <div key={c.id} className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-xl bg-[rgba(255,107,0,0.12)] flex items-center justify-center"><Percent size={18} className="text-[#FF6B00]" /></div>
+                          <div>
+                            <p className="text-white font-black text-[15px] tracking-wide font-mono">{c.code}</p>
+                            <p className="text-[#FF6B00] text-[12px] font-bold">
+                              {c.discountType === 'flat' ? `₹${c.discountValue} off` : `${c.discountValue}% off`}
+                              {c.maxDiscount ? ` (max ₹${c.maxDiscount})` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${status === 'active' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-red-500/15 text-red-400 border-red-500/20'}`}>{status}</span>
+                      </div>
+                      {c.description && <p className="text-[rgba(245,245,245,0.45)] text-[12px] mb-3">{c.description}</p>}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[rgba(245,245,245,0.5)] mb-3">
+                        {c.minAmount > 0 && <span>Min order ₹{c.minAmount.toLocaleString()}</span>}
+                        {c.expiresAt && <span>Expires {new Date(c.expiresAt).toLocaleDateString('en-IN')}</span>}
+                        <span>{c.usedCount ?? 0}{c.usageLimit ? ` / ${c.usageLimit}` : ''} used</span>
+                      </div>
+                      {c.usageLimit ? (
+                        <div className="mb-3">
+                          <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+                            <div className="h-full rounded-full bg-[#FF6B00]" style={{ width: `${usePct}%` }} />
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="flex gap-2 pt-3 border-t border-[rgba(255,255,255,0.06)]">
+                        <button onClick={() => openEditCoupon(c)} className="flex-1 py-2 text-[12px] text-[rgba(245,245,245,0.6)] hover:text-white border border-[rgba(255,255,255,0.1)] rounded-lg transition-all flex items-center justify-center gap-1.5"><Edit2 size={12} /> Edit</button>
+                        <button onClick={() => removeCoupon(c)} className="py-2 px-3 text-[12px] text-red-400 hover:bg-red-500/10 border border-red-500/20 rounded-lg transition-all"><Trash2 size={12} /></button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Create / edit coupon modal */}
+              <AnimatePresence>
+                {showCouponForm && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+                    onClick={() => setShowCouponForm(false)}>
+                    <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+                      className="w-full max-w-lg bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.1)] p-6 max-h-[90vh] overflow-y-auto"
+                      onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center justify-between mb-5">
+                        <h3 className="font-black text-lg text-white">{couponForm.id ? 'Edit Coupon' : 'Create Coupon'}</h3>
+                        <button onClick={() => setShowCouponForm(false)} className="text-[rgba(245,245,245,0.4)] hover:text-white"><X size={18} /></button>
+                      </div>
+                      <div className="space-y-4">
                         <div>
-                          <p className="text-white font-black text-[15px] tracking-wide font-mono">{c.code}</p>
-                          <p className="text-[rgba(245,245,245,0.4)] text-[12px]">{c.desc}</p>
+                          <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Coupon Code *</label>
+                          <input value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                            placeholder="WELCOME10" className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white font-mono uppercase outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Description</label>
+                          <input value={couponForm.description} onChange={e => setCouponForm(f => ({ ...f, description: e.target.value }))}
+                            placeholder="10% off for new customers" className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Discount Type *</label>
+                            <select value={couponForm.discountType} onChange={e => setCouponForm(f => ({ ...f, discountType: e.target.value as 'percent' | 'flat' }))}
+                              className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]">
+                              <option value="percent">Percentage (%)</option>
+                              <option value="flat">Flat (₹)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">{couponForm.discountType === 'flat' ? 'Amount (₹) *' : 'Percent (%) *'}</label>
+                            <input type="number" min="0" value={couponForm.discountValue} onChange={e => setCouponForm(f => ({ ...f, discountValue: e.target.value }))}
+                              placeholder={couponForm.discountType === 'flat' ? '100' : '10'} className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Min Order (₹)</label>
+                            <input type="number" min="0" value={couponForm.minAmount} onChange={e => setCouponForm(f => ({ ...f, minAmount: e.target.value }))}
+                              placeholder="0" className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Max Discount (₹)</label>
+                            <input type="number" min="0" value={couponForm.maxDiscount} onChange={e => setCouponForm(f => ({ ...f, maxDiscount: e.target.value }))}
+                              placeholder="No cap" className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Usage Limit</label>
+                            <input type="number" min="0" value={couponForm.usageLimit} onChange={e => setCouponForm(f => ({ ...f, usageLimit: e.target.value }))}
+                              placeholder="Unlimited" className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold tracking-widest text-[rgba(245,245,245,0.4)] uppercase mb-1.5">Expiry Date</label>
+                            <input type="date" value={couponForm.expiresAt} onChange={e => setCouponForm(f => ({ ...f, expiresAt: e.target.value }))}
+                              className="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[rgba(255,107,0,0.4)]" />
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-2.5 cursor-pointer">
+                          <input type="checkbox" checked={couponForm.active} onChange={e => setCouponForm(f => ({ ...f, active: e.target.checked }))}
+                            className="w-4 h-4 accent-[#FF6B00]" />
+                          <span className="text-sm text-[rgba(245,245,245,0.7)]">Active (customers can use this coupon)</span>
+                        </label>
+                        <div className="flex gap-3 pt-2">
+                          <button onClick={() => setShowCouponForm(false)} className="flex-1 py-3 text-sm font-semibold text-[rgba(245,245,245,0.6)] hover:text-white border border-[rgba(255,255,255,0.1)] rounded-xl transition-all">Cancel</button>
+                          <button onClick={submitCoupon} disabled={savingCoupon}
+                            className="flex-1 py-3 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                            {savingCoupon ? <><Loader2 size={15} className="animate-spin" /> Saving…</> : <><Save size={15} /> {couponForm.id ? 'Update' : 'Create'} Coupon</>}
+                          </button>
                         </div>
                       </div>
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${c.status === 'active' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-red-500/15 text-red-400 border-red-500/20'}`}>{c.status}</span>
-                    </div>
-                    <div className="mb-2">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[11px] text-[rgba(245,245,245,0.4)]">{c.used} / {c.limit} used</span>
-                        <span className="text-[11px] text-white font-bold">{Math.round((c.used / c.limit) * 100)}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
-                        <div className="h-full rounded-full bg-[#FF6B00]" style={{ width: `${Math.min((c.used / c.limit) * 100, 100)}%` }} />
-                      </div>
-                    </div>
-                    <div className="flex gap-2 pt-3 border-t border-[rgba(255,255,255,0.06)]">
-                      <button className="flex-1 py-2 text-[12px] text-[rgba(245,245,245,0.6)] hover:text-white border border-[rgba(255,255,255,0.1)] rounded-lg transition-all flex items-center justify-center gap-1.5"><Edit2 size={12} /> Edit</button>
-                      <button onClick={() => setCouponList(prev => prev.filter(x => x.code !== c.code))} className="py-2 px-3 text-[12px] text-red-400 hover:bg-red-500/10 border border-red-500/20 rounded-lg transition-all"><Trash2 size={12} /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
 

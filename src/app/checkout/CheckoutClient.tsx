@@ -88,7 +88,7 @@ function Field({
 
 export default function CheckoutClient() {
   const router = useRouter();
-  const { items, totalPrice, clearCart } = useCart();
+  const { items, totalPrice, discount, appliedCoupon, clearCart } = useCart();
   const [step, setStep] = useState<'checkout' | 'success'>('checkout');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [orderId, setOrderId] = useState('');
@@ -207,7 +207,6 @@ export default function CheckoutClient() {
   }, []);
 
   const shipping = totalPrice >= 999 ? 0 : 99;
-  const discount = Math.floor(totalPrice * 0.05);
   const finalTotal = totalPrice + shipping - discount;
 
   const set = (key: keyof ShippingForm) => (val: string) => {
@@ -254,6 +253,7 @@ export default function CheckoutClient() {
       subtotal: totalPrice,
       shipping,
       discount,
+      coupon: appliedCoupon?.code ?? '',
       total: finalTotal,
       status,
       createdAt: new Date().toISOString(),
@@ -674,7 +674,7 @@ export default function CheckoutClient() {
                   {[
                     { label: 'Subtotal', value: `₹${totalPrice.toLocaleString()}` },
                     { label: 'Delivery Fee', value: shipping === 0 ? 'FREE' : `₹${shipping}`, highlight: shipping === 0 },
-                    { label: 'Loyalty Discount (5%)', value: `-₹${discount.toLocaleString()}`, highlight: true },
+                    ...(discount > 0 ? [{ label: `Coupon${appliedCoupon ? ` (${appliedCoupon.code})` : ''}`, value: `-₹${discount.toLocaleString()}`, highlight: true }] : []),
                   ].map(({ label, value, highlight }) => (
                     <div key={label} className="flex items-center justify-between text-[13px]">
                       <span className="text-[rgba(245,245,245,0.5)]">{label}</span>

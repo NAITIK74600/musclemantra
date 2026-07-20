@@ -82,9 +82,30 @@ foreach ($reqItems as $it) {
 }
 if ($subtotal <= 0) fail("Invalid order amount");
 
-// Shipping + loyalty discount — identical rules to the storefront, enforced here.
+// Shipping + coupon discount — enforced server-side; client values are ignored.
 $shipping = $subtotal >= 999 ? 0.0 : 99.0;
-$discount = floor($subtotal * 0.05);
+$discount = 0.0;
+$couponRow = null;
+$couponCode = strtoupper(preg_replace('/[^A-Za-z0-9_-]/', '', (string)($d["coupon"] ?? $d["couponCode"] ?? "")));
+if ($couponCode !== "") {
+    $cs = $db->prepare("SELECT * FROM coupons WHERE code = ? LIMIT 1");
+    $cs->execute([$couponCode]);
+    $row = $cs->fetch();
+    $valid = $row
+        && (int)$row["is_active"] === 1
+        && ($row["expires_at"] === null || strtotime($row["expires_at"]) >= time())
+        && ($row["usage_limit"] === null || (int)$row["used_count"] < (int)$row["usage_limit"])
+        && (float)$row["min_amount"] <= $subtotal;
+    if ($valid) {
+        $couponRow = $row;
+        $discount = ($row["discount_type"] === "flat")
+            ? (float)$row["discount_value"]
+            : $subtotal * (float)$row["discount_value"] / 100;
+        if ($row["max_discount"] !== null && $discount > (float)$row["max_discount"]) $discount = (float)$row["max_discount"];
+        if ($discount > $subtotal) $discount = $subtotal;
+        $discount = round($discount, 2);
+    }
+}
 $total    = $subtotal + $shipping - $discount;
 
 $db->prepare(
@@ -116,6 +137,14 @@ try {
     $db->prepare("INSERT INTO invoices (invoice_number, order_id, amount, status) VALUES (?,?,?,?)")
        ->execute([$invNum, $oid, $total, "issued"]);
 } catch (PDOException $e) { /* duplicate — ignore */ }
+
+// Count the coupon redemption (best-effort — never blocks the order).
+if ($couponRow) {
+    try {
+        $db->prepare("UPDATE coupons SET used_count = used_count + 1 WHERE id = ?")
+           ->execute([(int)$couponRow["id"]]);
+    } catch (Throwable $e) { /* ignore */ }
+}
 
 // Send order-confirmation email (best-effort — never blocks the order).
 // IMPORTANT: online payments are created as "Payment Pending" BEFORE the user

@@ -68,7 +68,16 @@ function body(int $max = MAX_BODY_BYTES): array {
 }
 
 function bearerToken(): ?string {
-    $h = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    // cPanel / FastCGI (and some Apache setups) do NOT expose the Authorization
+    // header in $_SERVER['HTTP_AUTHORIZATION'] by default. Check every place it
+    // can surface so bearer-token admin auth works reliably on live hosting.
+    $h = $_SERVER['HTTP_AUTHORIZATION']
+        ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+        ?? '';
+    if ($h === '' && function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        $h = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    }
     return preg_match('/^Bearer\s+(\S+)$/i', $h, $m) ? $m[1] : null;
 }
 

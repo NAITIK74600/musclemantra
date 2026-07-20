@@ -764,6 +764,107 @@ export async function deleteBrandServer(id: string): Promise<boolean> {
   } catch { return false; }
 }
 
+/* ── Coupons ──────────────────────────────────────────────────────────────
+   Coupons live server-side only (single source of truth). Admin CRUD is
+   bearer-authenticated; validation is public so the storefront can check a
+   code against a cart subtotal before checkout. The order endpoint always
+   re-validates + recomputes the discount server-side (never trusts client). */
+
+export type Coupon = {
+  id?: number;
+  code: string;
+  description?: string;
+  discountType: 'percent' | 'flat';
+  discountValue: number;
+  minAmount: number;
+  maxDiscount: number | null;
+  usageLimit: number | null;
+  usedCount?: number;
+  expiresAt?: string | null;
+  active: boolean;
+};
+
+/** Admin: list every coupon. */
+export async function listCouponsServer(): Promise<Coupon[]> {
+  try {
+    const res = await fetch('/api/coupons/list', { headers: adminHeaders() });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.coupons) ? (data.coupons as Coupon[]) : [];
+  } catch { return []; }
+}
+
+/** Admin: create or update a coupon. */
+export async function saveCouponServer(c: Partial<Coupon>): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res = await fetch('/api/coupons/save', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({
+        id: c.id,
+        code: c.code,
+        description: c.description ?? '',
+        discountType: c.discountType ?? 'percent',
+        discountValue: c.discountValue ?? 0,
+        minAmount: c.minAmount ?? 0,
+        maxDiscount: c.maxDiscount ?? '',
+        usageLimit: c.usageLimit ?? '',
+        expiresAt: c.expiresAt ?? '',
+        active: c.active === false ? 0 : 1,
+      }),
+    });
+    if (res.ok) return { ok: true };
+    const data = await res.json().catch(() => ({}));
+    return { ok: false, message: (data as { error?: string }).error ?? 'Could not save coupon' };
+  } catch { return { ok: false, message: 'Network error' }; }
+}
+
+/** Admin: delete a coupon. */
+export async function deleteCouponServer(id: number): Promise<boolean> {
+  try {
+    const res = await fetch('/api/coupons/delete', {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify({ id }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+export type CouponValidation = {
+  ok: boolean;
+  code?: string;
+  discount?: number;
+  discountType?: 'percent' | 'flat';
+  discountValue?: number;
+  minAmount?: number;
+  maxDiscount?: number | null;
+  description?: string;
+  message?: string;
+};
+
+/** Public: validate a code against a cart subtotal and return the discount. */
+export async function validateCouponServer(code: string, subtotal: number): Promise<CouponValidation> {
+  try {
+    const res = await fetch('/api/coupons/validate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, subtotal }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && (data as { valid?: boolean }).valid) {
+      const d = data as CouponValidation & { valid: boolean };
+      return {
+        ok: true,
+        code: d.code,
+        discount: d.discount,
+        discountType: d.discountType,
+        discountValue: d.discountValue,
+        minAmount: d.minAmount,
+        maxDiscount: d.maxDiscount ?? null,
+        description: d.description,
+      };
+    }
+    return { ok: false, message: (data as { error?: string }).error ?? 'Invalid coupon code' };
+  } catch { return { ok: false, message: 'Network error' }; }
+}
+
 /**
  * Upload an image file to the server and return its public https URL (or null).
  * Used for product + category images so they persist and sync across devices —
