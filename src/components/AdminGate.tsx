@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, FormEvent } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck, Lock, Mail, Eye, EyeOff, Loader2, ArrowLeft, KeyRound, CheckCircle2,
@@ -24,6 +25,18 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
     setAuthed(isAdminAuthenticated());
     setReady(true);
   }, []);
+
+  // Keep the browser Back button inside the admin panel while signed in —
+  // pressing Back must NOT drop the admin onto the public storefront. To
+  // leave, use the Logout button (or the “Back to store” link on the login
+  // screen when signed out).
+  useEffect(() => {
+    if (!authed || typeof window === 'undefined') return;
+    window.history.pushState(null, '', window.location.href);
+    const onPop = () => window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [authed]);
 
   if (!ready) {
     return (
@@ -79,6 +92,12 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
         <p className="text-center text-xs text-neutral-600 mt-6">
           Muscle Mantra • Authorized personnel only
         </p>
+        <Link
+          href="/"
+          className="mt-3 flex items-center justify-center gap-1.5 text-xs text-neutral-500 hover:text-orange-400 transition"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to store
+        </Link>
       </motion.div>
     </div>
   );

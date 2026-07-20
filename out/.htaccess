@@ -40,6 +40,12 @@ RewriteRule ^(.+?)/?$ /$1/index.html [L]
 # id (e.g. /invoice/MB123) — the client reads the real id from the URL & fetches.
 RewriteRule ^invoice/[^/]+/?$ /invoice/_/index.html [L]
 
+# ── Dynamic product detail pages ─────────────────────────────────────────────
+# Static export only builds the /products/_ placeholder. Serve it for ANY
+# product id (e.g. /products/p_abc123, including admin/CSV-created products) —
+# the client reads the real id from the URL and looks it up in the catalogue.
+RewriteRule ^products/[^/]+/?$ /products/_/index.html [L]
+
 # ── Unknown routes → the exported 404 page (never the homepage) ──────────────
 ErrorDocument 404 /404.html
 RewriteRule ^ /404.html [L]

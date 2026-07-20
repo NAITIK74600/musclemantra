@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   Truck, MapPin, Phone, MessageCircle, Navigation, LocateFixed,
   Radio, PackageCheck, KeyRound, RefreshCw, LogOut, Loader2, ShieldCheck, IndianRupee, Undo2,
+  Eye, EyeOff, ArrowLeft,
 } from 'lucide-react';
 
 const KEY_STORE = 'mb_delivery_key';
@@ -35,6 +37,7 @@ export default function DeliveryPanel() {
   const [key, setKey] = useState('');
   const [authed, setAuthed] = useState(false);
   const [keyInput, setKeyInput] = useState('');
+  const [showKey, setShowKey] = useState(false);
   const [riderName, setRiderName] = useState('');
   const [orders, setOrders] = useState<RiderOrder[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,6 +96,17 @@ export default function DeliveryPanel() {
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
   }, [authed, load]);
+
+  // Keep the browser Back button inside the delivery panel while signed in —
+  // pressing Back must NOT drop the rider onto the public storefront. To leave,
+  // use Logout (or the “Back to store” link on the login screen).
+  useEffect(() => {
+    if (!authed || typeof window === 'undefined') return;
+    window.history.pushState(null, '', window.location.href);
+    const onPop = () => window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [authed]);
 
   const signIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,46 +231,73 @@ export default function DeliveryPanel() {
   // ── Login gate ───────────────────────────────────────────────────────────
   if (!authed) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center px-5">
-        <form
-          onSubmit={signIn}
-          className="w-full max-w-sm bg-[#0d0d0d] border border-white/8 rounded-2xl p-7"
-        >
-          <div className="w-12 h-12 rounded-xl bg-[rgba(255,107,0,0.12)] flex items-center justify-center mb-4">
-            <Truck size={22} style={{ color: ORANGE }} />
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center px-5 relative overflow-hidden">
+        {/* ambient glow */}
+        <div className="pointer-events-none absolute -top-40 -right-40 w-96 h-96 rounded-full bg-orange-600/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-orange-500/10 blur-3xl" />
+
+        <div className="relative w-full max-w-sm">
+          <div className="rounded-2xl border border-white/10 bg-[#0d0d0d]/85 backdrop-blur-xl shadow-2xl overflow-hidden">
+            <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500" />
+            <form onSubmit={signIn} className="p-7">
+              <div className="flex flex-col items-center text-center mb-7">
+                <div className="w-14 h-14 rounded-2xl bg-[rgba(255,107,0,0.14)] border border-orange-500/30 flex items-center justify-center mb-4">
+                  <Truck size={26} style={{ color: ORANGE }} />
+                </div>
+                <h1 className="text-white font-extrabold text-2xl tracking-tight">Delivery Panel</h1>
+                <p className="text-white/45 text-sm mt-1">Riders only — enter your delivery key to continue.</p>
+              </div>
+
+              <label className="block text-[11px] font-bold tracking-wide text-white/40 uppercase mb-1.5">Your name</label>
+              <input
+                value={riderName}
+                onChange={(e) => setRiderName(e.target.value)}
+                placeholder="e.g. Rahul"
+                className="w-full mb-4 px-4 py-3 bg-black border border-white/10 rounded-xl text-white text-sm outline-none focus:border-[rgba(255,107,0,0.5)] transition"
+              />
+
+              <label className="block text-[11px] font-bold tracking-wide text-white/40 uppercase mb-1.5">Delivery key</label>
+              <div className="relative mb-4">
+                <input
+                  value={keyInput}
+                  onChange={(e) => setKeyInput(e.target.value)}
+                  type={showKey ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="Enter delivery key"
+                  className="w-full px-4 py-3 pr-11 bg-black border border-white/10 rounded-xl text-white text-sm outline-none focus:border-[rgba(255,107,0,0.5)] transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey((v) => !v)}
+                  aria-label={showKey ? 'Hide key' : 'Show key'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/35 hover:text-white/70 transition"
+                >
+                  {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              {err && <p className="text-red-400 text-xs mb-3">{err}</p>}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-bold transition-all disabled:opacity-60 hover:brightness-110"
+                style={{ background: ORANGE }}
+              >
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                {loading ? 'Verifying…' : 'Enter panel'}
+              </button>
+            </form>
           </div>
-          <h1 className="text-white font-black text-xl mb-1">Delivery Panel</h1>
-          <p className="text-white/40 text-sm mb-6">Riders only — enter your delivery key to continue.</p>
 
-          <label className="block text-[11px] font-bold tracking-wide text-white/40 uppercase mb-1.5">Your name</label>
-          <input
-            value={riderName}
-            onChange={(e) => setRiderName(e.target.value)}
-            placeholder="e.g. Rahul"
-            className="w-full mb-4 px-4 py-3 bg-black border border-white/10 rounded-xl text-white text-sm outline-none focus:border-[rgba(255,107,0,0.5)]"
-          />
-
-          <label className="block text-[11px] font-bold tracking-wide text-white/40 uppercase mb-1.5">Delivery key</label>
-          <input
-            value={keyInput}
-            onChange={(e) => setKeyInput(e.target.value)}
-            type="password"
-            placeholder="Enter delivery key"
-            className="w-full mb-4 px-4 py-3 bg-black border border-white/10 rounded-xl text-white text-sm outline-none focus:border-[rgba(255,107,0,0.5)]"
-          />
-
-          {err && <p className="text-red-400 text-xs mb-3">{err}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-bold transition-all disabled:opacity-60"
-            style={{ background: ORANGE }}
+          <Link
+            href="/"
+            className="mt-5 flex items-center justify-center gap-1.5 text-xs text-white/40 hover:text-orange-400 transition"
           >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-            Enter panel
-          </button>
-        </form>
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to store
+          </Link>
+          <p className="text-center text-[11px] text-white/25 mt-3">Muscle Mantra • Authorized riders only</p>
+        </div>
       </div>
     );
   }

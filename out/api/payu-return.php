@@ -58,11 +58,12 @@ if ($safeTxnid && $hashValid) {
     $db = getDB();
     // Defense-in-depth: the amount PayU reports MUST match the stored order
     // total. If it doesn't, treat it as failed (possible tampering).
-    $ord = $db->prepare("SELECT total FROM orders WHERE id = ? LIMIT 1");
+    $ord = $db->prepare("SELECT * FROM orders WHERE id = ? LIMIT 1");
     $ord->execute([$safeTxnid]);
     $row      = $ord->fetch();
     $amountOk = $row && abs((float)$row['total'] - (float)$amount) < 0.5;
     $paidOk   = (strtolower($status) === 'success') && $amountOk;
+    $prevStatus = strtolower($row['status'] ?? '');
 
     $newStatus = $paidOk ? 'Payment Received' : 'Payment Failed';
     try {
@@ -79,6 +80,32 @@ if ($safeTxnid && $hashValid) {
             json_encode($_POST),
         ]);
     } catch (Exception $e) { /* log silently */ }
+
+    // Only NOW (payment genuinely verified) send the "order confirmed" email +
+    // admin alert. Skipped for pending/failed/abandoned payments, and guarded so
+    // a repeated PayU callback / page refresh never emails twice.
+    if ($paidOk && $prevStatus !== 'payment received' && $row) {
+        require_once __DIR__ . '/mailer.php';
+        try {
+            $items   = json_decode($row['items'] ?? '[]', true);
+            $payload = [
+                'id'             => $safeTxnid,
+                'customer_name'  => $row['customer_name']  ?? $firstname,
+                'customer_email' => $row['customer_email'] ?? $email,
+                'customer_phone' => $row['customer_phone'] ?? '',
+                'total'          => $row['total']          ?? $amount,
+                'status'         => 'Payment Received',
+                'payment_method' => $row['payment_method'] ?? 'payu',
+                'items'          => is_array($items) ? $items : [],
+                'address'        => $row['address'] ?? '',
+                'city'           => $row['city']    ?? '',
+                'state'          => $row['state']   ?? '',
+                'pincode'        => $row['pincode'] ?? '',
+            ];
+            mm_order_email($payload, 'confirmation');   // → customer
+            mm_order_admin_alert($payload);              // → admin@
+        } catch (Throwable $e) { /* email must never break the redirect */ }
+    }
 }
 
 // ── Redirect to React page ────────────────────────────────────────────────

@@ -118,24 +118,32 @@ try {
 } catch (PDOException $e) { /* duplicate — ignore */ }
 
 // Send order-confirmation email (best-effort — never blocks the order).
-require_once __DIR__ . "/mailer.php";
-try {
-    $emailPayload = [
-        "id"             => $oid,
-        "customer_name"  => $clean($d["name"] ?? ($addr["name"] ?? "")),
-        "customer_email" => $clean($d["email"] ?? ""),
-        "customer_phone" => $clean($d["phone"] ?? ""),
-        "total"          => $total,
-        "status"         => $status,
-        "payment_method" => $clean($d["paymentMethod"] ?? $d["payment"] ?? "cod"),
-        "items"          => $cleanItems,
-        "address"        => $clean($addr["line1"] ?? $addr["address"] ?? ""),
-        "city"           => $clean($addr["city"] ?? ""),
-        "state"          => $clean($addr["state"] ?? ""),
-        "pincode"        => $clean($addr["pincode"] ?? ""),
-    ];
-    mm_order_email($emailPayload, "confirmation");   // → customer
-    mm_order_admin_alert($emailPayload);              // → admin@ (new-order alert)
-} catch (Throwable $e) { /* email failure must not fail the order */ }
+// IMPORTANT: online payments are created as "Payment Pending" BEFORE the user
+// reaches PayU. We must NOT send a "confirmed" email for those — otherwise a
+// customer who abandons / backs out of the gateway still gets a confirmation.
+// The confirmation for online orders is sent from payu-return.php once PayU
+// verifies the payment. COD orders (already confirmed) email immediately.
+$isUnpaidOnline = (stripos($status, "Pending") !== false) || (stripos($status, "Failed") !== false);
+if (!$isUnpaidOnline) {
+    require_once __DIR__ . "/mailer.php";
+    try {
+        $emailPayload = [
+            "id"             => $oid,
+            "customer_name"  => $clean($d["name"] ?? ($addr["name"] ?? "")),
+            "customer_email" => $clean($d["email"] ?? ""),
+            "customer_phone" => $clean($d["phone"] ?? ""),
+            "total"          => $total,
+            "status"         => $status,
+            "payment_method" => $clean($d["paymentMethod"] ?? $d["payment"] ?? "cod"),
+            "items"          => $cleanItems,
+            "address"        => $clean($addr["line1"] ?? $addr["address"] ?? ""),
+            "city"           => $clean($addr["city"] ?? ""),
+            "state"          => $clean($addr["state"] ?? ""),
+            "pincode"        => $clean($addr["pincode"] ?? ""),
+        ];
+        mm_order_email($emailPayload, "confirmation");   // → customer
+        mm_order_admin_alert($emailPayload);              // → admin@ (new-order alert)
+    } catch (Throwable $e) { /* email failure must not fail the order */ }
+}
 
 ok(["ok" => true, "id" => $oid, "invoice" => $invNum, "total" => $total], 201);
