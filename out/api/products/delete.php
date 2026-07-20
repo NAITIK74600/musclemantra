@@ -5,6 +5,8 @@ requireAdmin();
 $d  = body();
 $id = preg_replace('/[^A-Za-z0-9\-_]/', '', $d['id'] ?? '');
 if (!$id) fail('Product ID required');
-// Soft delete — keeps order history intact
-getDB()->prepare('UPDATE products SET is_active = 0 WHERE id = ?')->execute([$id]);
+// Hard delete — permanently removes the product row. Related reviews / wishlist /
+// cart / variant rows are removed automatically via ON DELETE CASCADE. Order
+// history is unaffected because orders store their items as a JSON snapshot.
+getDB()->prepare('DELETE FROM products WHERE id = ?')->execute([$id]);
 ok(['ok' => true]);

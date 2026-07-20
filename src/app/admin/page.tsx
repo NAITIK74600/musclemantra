@@ -954,6 +954,8 @@ function AdminDashboard() {
   // ── Products (persisted, admin-managed CRUD) ─────────────────────────────
   const [productSearch, setProductSearch] = useState('');
   const [productCategoryFilter, setProductCategoryFilter] = useState('all');
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [productDraft, setProductDraft] = useState<AdminProduct | null>(null); // null = modal closed
   const productImgRef = useRef<HTMLInputElement>(null);
 
@@ -1035,13 +1037,45 @@ function AdminDashboard() {
 
   const removeProduct = async (id: string) => {
     const p = productList.find(x => x.id === id);
+    if (!window.confirm(`Permanently delete "${p?.name ?? 'this product'}"? This removes it from the database and cannot be undone.`)) return;
     const serverOk = await deleteProductServer(id);
     deleteProduct(id);
     if (serverOk) { await syncProductsForAdmin(); }
     setProductList(getProducts());
+    setSelectedProductIds(prev => { const n = new Set(prev); n.delete(id); return n; });
     if (p) toast.push(serverOk
-      ? { variant: 'info', title: 'Product removed', description: p.name }
-      : { variant: 'error', title: 'Removed locally only', description: 'Server sync failed — check your connection.' });
+      ? { variant: 'success', title: 'Product deleted', description: `${p.name} removed from the database.` }
+      : { variant: 'error', title: 'Deleted locally only', description: 'Server sync failed — check your connection.' });
+  };
+
+  const toggleSelectProduct = (id: string) => {
+    setSelectedProductIds(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const bulkRemoveProducts = async () => {
+    const ids = Array.from(selectedProductIds);
+    if (ids.length === 0) return;
+    if (!window.confirm(`Permanently delete ${ids.length} product${ids.length === 1 ? '' : 's'}? This removes them from the database and cannot be undone.`)) return;
+    setBulkDeleting(true);
+    let ok = 0, fail = 0;
+    for (const id of ids) {
+      const serverOk = await deleteProductServer(id);
+      deleteProduct(id);
+      if (serverOk) ok++; else fail++;
+    }
+    if (ok > 0) { await syncProductsForAdmin(); }
+    setProductList(getProducts());
+    setSelectedProductIds(new Set());
+    setBulkDeleting(false);
+    toast.push({
+      variant: fail === 0 ? 'success' : 'error',
+      title: `${ok} product${ok === 1 ? '' : 's'} deleted`,
+      description: fail ? `${fail} failed to sync to the server.` : 'Removed from the database.',
+    });
   };
 
   const toggleProductActive = async (id: string) => {
@@ -1601,6 +1635,22 @@ function AdminDashboard() {
                 </div>
               </div>
 
+              {selectedProductIds.size > 0 && (
+                <div className="flex items-center justify-between gap-3 flex-wrap bg-[rgba(255,107,0,0.08)] border border-[rgba(255,107,0,0.25)] rounded-xl px-4 py-3">
+                  <span className="text-sm text-white font-semibold">{selectedProductIds.size} selected</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setSelectedProductIds(new Set())}
+                      className="px-3.5 py-2 text-[12px] font-bold text-[rgba(245,245,245,0.7)] hover:text-white border border-[rgba(255,255,255,0.12)] rounded-lg transition-all">
+                      Clear
+                    </button>
+                    <button onClick={bulkRemoveProducts} disabled={bulkDeleting}
+                      className="flex items-center gap-2 px-3.5 py-2 text-[12px] font-bold text-white bg-red-500/90 hover:bg-red-500 rounded-lg transition-all disabled:opacity-50">
+                      {bulkDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Delete selected
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-[#111] rounded-2xl border border-[rgba(255,255,255,0.06)] overflow-hidden">
                 {filteredProducts.length === 0 ? (
                   <div className="p-10 text-center text-[rgba(245,245,245,0.4)] text-sm">
@@ -1611,6 +1661,12 @@ function AdminDashboard() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)]">
+                          <th className="w-10 px-5 py-3.5">
+                            <input type="checkbox"
+                              checked={filteredProducts.length > 0 && filteredProducts.every(p => selectedProductIds.has(p.id))}
+                              onChange={e => setSelectedProductIds(e.target.checked ? new Set(filteredProducts.map(p => p.id)) : new Set())}
+                              className="w-4 h-4 accent-[#FF6B00] cursor-pointer" aria-label="Select all" />
+                          </th>
                           {['Product', 'SKU', 'Category', 'Price', 'Stock', 'Status', 'Action'].map(h => (
                             <th key={h} className="text-left px-5 py-3.5 text-[10px] font-bold tracking-widest text-[rgba(245,245,245,0.35)] uppercase">{h}</th>
                           ))}
@@ -1621,7 +1677,12 @@ function AdminDashboard() {
                           const cat = categoryList.find(c => c.id === p.category);
                           const status = p.stock === 0 ? 'out' : p.stock < (p.reorderAt || 0) ? 'low' : 'active';
                           return (
-                            <tr key={p.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-white/[0.02] transition-colors">
+                            <tr key={p.id} className={`border-b border-[rgba(255,255,255,0.04)] transition-colors ${selectedProductIds.has(p.id) ? 'bg-[rgba(255,107,0,0.06)]' : 'hover:bg-white/[0.02]'}`}>
+                              <td className="px-5 py-3.5">
+                                <input type="checkbox" checked={selectedProductIds.has(p.id)}
+                                  onChange={() => toggleSelectProduct(p.id)}
+                                  className="w-4 h-4 accent-[#FF6B00] cursor-pointer" aria-label={`Select ${p.name}`} />
+                              </td>
                               <td className="px-5 py-3.5">
                                 <div className="flex items-center gap-3">
                                   <div className="w-11 h-11 rounded-lg bg-[#1a1a1a] border border-[rgba(255,255,255,0.08)] flex items-center justify-center overflow-hidden shrink-0">
