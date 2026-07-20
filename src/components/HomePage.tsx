@@ -11,6 +11,7 @@ import {
 import {
   getBrands, getPromos, getProducts, getCategories, onStoreChange,
   defaultBrands, defaultPromos, defaultAdminProducts, defaultCategories,
+  syncBrandsFromServer,
   type Brand, type Promo, type AdminProduct, type AdminCategory,
 } from '@/lib/store';
 import ProductCard from './ProductCard';
@@ -397,6 +398,7 @@ function TopBrandsSection() {
   // Load admin-managed brands from the shared store + live updates.
   useEffect(() => {
     setBrandData(getBrands());
+    void syncBrandsFromServer();
     return onStoreChange(() => setBrandData(getBrands()));
   }, []);
 

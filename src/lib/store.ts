@@ -705,6 +705,65 @@ export async function deleteCategoryServer(id: string): Promise<boolean> {
   } catch { return false; }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Brands (server-backed so CSV-added / admin brands sync across every device)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function mapServerBrand(r: Record<string, unknown>): Brand {
+  const name = String(r.name ?? '').slice(0, 100);
+  const short =
+    (name.replace(/[^A-Za-z0-9\s]/g, '').split(/\s+/).map(w => w[0] ?? '').join('') || name)
+      .slice(0, 3)
+      .toUpperCase();
+  return {
+    id: String(r.id ?? uid()),
+    name,
+    short,
+    logo: sanitizeImageUrl(String(r.logo ?? r.logo_url ?? '')),
+  };
+}
+
+/**
+ * Pull the live brand directory into the local cache and MERGE it with any
+ * local-only brands (deduped by name). Merging — instead of overwriting — means
+ * a partial server list can never wipe the local defaults. Fires store-change.
+ */
+export async function syncBrandsFromServer(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const res = await fetch('/api/brands/list');
+    if (!res.ok) return;
+    const data = await res.json();
+    const rows = Array.isArray(data?.brands) ? data.brands : [];
+    if (rows.length === 0) return;
+    const byName = new Map<string, Brand>();
+    for (const b of getBrands()) byName.set(b.name.toLowerCase(), b);
+    for (const b of rows.map(mapServerBrand)) byName.set(b.name.toLowerCase(), b); // server wins
+    saveBrands(Array.from(byName.values()));
+  } catch { /* offline — keep local cache */ }
+}
+
+/** Upsert a brand on the server. */
+export async function saveBrandServer(b: Partial<Brand>): Promise<boolean> {
+  try {
+    const res = await fetch('/api/brands/save', {
+      method: 'POST', headers: adminHeaders(),
+      body: JSON.stringify({ id: b.id, name: b.name, logo: b.logo ?? '' }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+/** Delete a brand on the server. */
+export async function deleteBrandServer(id: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/brands/delete', {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify({ id }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
 /**
  * Upload an image file to the server and return its public https URL (or null).
  * Used for product + category images so they persist and sync across devices —

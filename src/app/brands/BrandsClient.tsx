@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Award, ArrowRight, ShieldCheck, Search } from 'lucide-react';
-import { getProducts, getBrands, onStoreChange, type AdminProduct, type Brand } from '@/lib/store';
+import { getProducts, getBrands, syncBrandsFromServer, onStoreChange, type AdminProduct, type Brand } from '@/lib/store';
 
 type BrandEntry = {
   name: string;
@@ -25,6 +25,7 @@ export default function BrandsClient() {
       setBrands(getBrands());
     };
     sync();
+    void syncBrandsFromServer();
     return onStoreChange(sync);
   }, []);
 

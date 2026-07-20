@@ -25,6 +25,7 @@ import {
   syncProductsForAdmin, syncCategoriesFromServer,
   createProductServer, updateProductServer, deleteProductServer,
   saveCategoryServer, deleteCategoryServer, uploadImageToServer,
+  syncBrandsFromServer, saveBrandServer, deleteBrandServer,
 } from '@/lib/store';
 import { parseCSV, toCSV, downloadCSV } from '@/lib/csv';
 import { useToast } from '@/components/ToastProvider';
@@ -907,6 +908,7 @@ function AdminDashboard() {
     // edits the real data — not a stale local copy from another device.
     void syncProductsForAdmin();
     void syncCategoriesFromServer();
+    void syncBrandsFromServer();
     return off;
   }, []);
 
@@ -921,12 +923,14 @@ function AdminDashboard() {
   const addBrand = () => {
     if (!brandForm.name.trim()) return;
     const short = (brandForm.short.trim() || brandForm.name.trim().slice(0, 3)).toUpperCase();
-    const next = [...brandList, { id: uid(), name: brandForm.name.trim(), short, logo: brandForm.logo || undefined }];
+    const newBrand: Brand = { id: uid(), name: brandForm.name.trim(), short, logo: brandForm.logo || undefined };
+    const next = [...brandList, newBrand];
     setBrandList(next); saveBrands(next);
+    void saveBrandServer(newBrand);
     setBrandForm({ name: '', short: '', logo: '' });
     if (brandFileRef.current) brandFileRef.current.value = '';
   };
-  const removeBrand = (id: string) => { const next = brandList.filter(b => b.id !== id); setBrandList(next); saveBrands(next); };
+  const removeBrand = (id: string) => { const next = brandList.filter(b => b.id !== id); setBrandList(next); saveBrands(next); void deleteBrandServer(id); };
 
   // Promo form
   const [promoForm, setPromoForm] = useState<{ title: string; type: 'photo' | 'video'; url: string; link: string }>({ title: '', type: 'photo', url: '', link: '/products' });
@@ -1145,8 +1149,8 @@ function AdminDashboard() {
       const brandsWorking = getBrands();
       const catsWorking = getCategories();
       const newCats: AdminCategory[] = [];
+      const addedBrands: Brand[] = [];
       const catIcons = ['📦', '💊', '🔥', '⚡', '🥤', '🍫', '💪', '🧬'];
-      let newBrands = 0;
 
       const resolveCategory = (raw: string): string => {
         const v = raw.trim().toLowerCase();
@@ -1166,8 +1170,9 @@ function AdminDashboard() {
         const name = (raw ?? '').trim();
         if (!name) return '';
         if (!brandsWorking.some(b => b.name.toLowerCase() === name.toLowerCase())) {
-          brandsWorking.push({ id: uid(), name: name.slice(0, 100), short: brandShort(name) });
-          newBrands++;
+          const b: Brand = { id: uid(), name: name.slice(0, 100), short: brandShort(name) };
+          brandsWorking.push(b);
+          addedBrands.push(b);
         }
         return name;
       };
@@ -1220,7 +1225,11 @@ function AdminDashboard() {
 
       // Persist the brands / categories the CSV introduced (local + server) so
       // every device and the live storefront see them.
-      if (newBrands > 0) { saveBrands(brandsWorking); setBrandList(getBrands()); }
+      if (addedBrands.length > 0) {
+        saveBrands(brandsWorking);
+        for (const b of addedBrands) { await saveBrandServer(b); }
+        setBrandList(getBrands());
+      }
       if (newCats.length > 0) {
         saveCategories(catsWorking);
         for (const c of newCats) { await saveCategoryServer(c); }
@@ -1232,7 +1241,7 @@ function AdminDashboard() {
       if (added > 0 && serverSynced === added) { await syncProductsForAdmin(); }
       setProductList(getProducts());
       const extras = [
-        newBrands ? `${newBrands} new brand${newBrands === 1 ? '' : 's'}` : '',
+        addedBrands.length ? `${addedBrands.length} new brand${addedBrands.length === 1 ? '' : 's'}` : '',
         newCats.length ? `${newCats.length} new categor${newCats.length === 1 ? 'y' : 'ies'}` : '',
       ].filter(Boolean).join(' · ');
       toast.push({
