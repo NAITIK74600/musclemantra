@@ -185,11 +185,15 @@ export default function InvoiceClient() {
       doc.text('TAX INVOICE', W - M, y, { align: 'right' });
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor('#666');
       y += 16;
-      doc.text('Authentic Supplements · Patna', M, y);
+      doc.text('Authentic Supplements · Patna, Bihar, India', M, y);
       doc.text(`Invoice #${order.id}`, W - M, y, { align: 'right' });
       y += 13;
-      doc.text('musclemantra.shop', M, y);
+      doc.text('musclemantra.shop · +91 84096 12737', M, y);
       doc.text(`Date: ${date}`, W - M, y, { align: 'right' });
+      y += 13;
+      doc.setFont('helvetica', 'bold'); doc.setTextColor('#333');
+      doc.text('GSTIN: 10LIYPK4956L1ZC', M, y);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor('#666');
 
       y += 22;
       doc.setDrawColor('#e5e5e5'); doc.line(M, y, W - M, y); y += 20;
@@ -305,10 +309,12 @@ export default function InvoiceClient() {
                 <div className="min-w-0">
                   <div className="font-[var(--font-montserrat)] font-black text-base sm:text-xl text-[#FF6B00] tracking-tight leading-tight">MUSCLE MANTRA</div>
                   <div className="text-[9px] sm:text-[10px] text-[rgba(245,245,245,0.35)] tracking-[2px] uppercase print:text-gray-400">Fuel Your Strength</div>
+                  <div className="text-[10px] sm:text-[11px] text-[rgba(245,245,245,0.5)] mt-1.5 print:text-gray-600">Patna, Bihar, India</div>
+                  <div className="text-[10px] sm:text-[11px] font-bold text-[rgba(245,245,245,0.6)] print:text-gray-700">GSTIN: 10LIYPK4956L1ZC</div>
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <div className="text-[10px] font-bold tracking-[2px] uppercase text-[rgba(245,245,245,0.35)] print:text-gray-400">Invoice</div>
+                <div className="text-[10px] font-bold tracking-[2px] uppercase text-[rgba(245,245,245,0.35)] print:text-gray-400">Tax Invoice</div>
                 <div className="font-[var(--font-montserrat)] font-black text-sm sm:text-2xl text-white print:text-black mt-1 break-all">#{order.id}</div>
                 <div className="text-[11px] sm:text-xs text-[rgba(245,245,245,0.45)] mt-1 print:text-gray-500 whitespace-nowrap">{date}</div>
               </div>
@@ -405,6 +411,9 @@ export default function InvoiceClient() {
             </p>
             <p className="text-[10px] text-[rgba(245,245,245,0.15)] mt-3 print:text-gray-300">
               Muscle Mantra • Patna, Bihar, India
+            </p>
+            <p className="text-[10px] text-[rgba(245,245,245,0.15)] mt-1 print:text-gray-300">
+              GSTIN: 10LIYPK4956L1ZC &nbsp;•&nbsp; This is a computer-generated invoice and does not require a signature.
             </p>
           </div>
 
