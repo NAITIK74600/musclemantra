@@ -770,6 +770,7 @@ function AdminDashboard() {
 
   const [orderList, setOrderList] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
   const [orderFilter, setOrderFilter] = useState('All');
   const [orderSearch, setOrderSearch] = useState('');
 
@@ -805,8 +806,19 @@ function AdminDashboard() {
           };
         };
         setOrderList(Array.isArray(data) ? data.map(norm) : []);
+        setOrdersError(null);
+      } else if (res.status === 401 || res.status === 403) {
+        // Session expired server-side (sessions live 6h) while the tab stayed open —
+        // the client-side 8h hint hadn't caught it yet. Sign out so AdminGate
+        // shows the login screen on next reload, and surface a clear message now.
+        signOutAdmin();
+        setOrdersError('Your admin session has expired. Please refresh the page and log in again.');
+      } else {
+        setOrdersError(`Could not load orders (HTTP ${res.status}). Please refresh and try again.`);
       }
-    } catch { /* silent */ }
+    } catch {
+      setOrdersError('Network error — could not load orders. Check your connection and refresh.');
+    }
     setOrdersLoading(false);
   }, []);
 
@@ -1778,7 +1790,9 @@ function AdminDashboard() {
                     <tbody>
                       {orderList.length === 0 && (
                         <tr><td colSpan={7} className="px-5 py-8 text-center text-xs text-[rgba(245,245,245,0.3)]">
-                          {ordersLoading ? 'Loading orders…' : 'No orders yet'}
+                          {ordersLoading ? 'Loading orders…' : ordersError ? (
+                            <span className="text-red-400">{ordersError}</span>
+                          ) : 'No orders yet'}
                         </td></tr>
                       )}
                       {orderList.slice(0, 5).map(o => {
@@ -2299,7 +2313,17 @@ function AdminDashboard() {
                   <tbody>
                     {filteredOrders.length === 0 && (
                       <tr><td colSpan={8} className="px-5 py-12 text-center text-sm text-[rgba(245,245,245,0.3)]">
-                        {ordersLoading ? 'Loading orders…' : 'No orders found'}
+                        {ordersLoading ? 'Loading orders…' : ordersError ? (
+                          <div className="flex flex-col items-center gap-3">
+                            <span className="text-red-400">{ordersError}</span>
+                            <button
+                              onClick={() => { signOutAdmin(); window.location.reload(); }}
+                              className="px-4 py-2 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-xs font-bold rounded-lg transition-all"
+                            >
+                              Log In Again
+                            </button>
+                          </div>
+                        ) : 'No orders found'}
                       </td></tr>
                     )}
                     {filteredOrders.map(o => {
