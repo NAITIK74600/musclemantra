@@ -14,10 +14,22 @@
 # On cPanel / FastCGI, Apache strips the Authorization header by default, which
 # makes Bearer-token admin auth silently fail — the admin panel then shows empty
 # lists (orders, trainer bookings, coupons, etc.). These rules restore it.
+#
+# IMPORTANT: enabling RewriteEngine in this sub-directory STOPS Apache from
+# inheriting the parent (site root) rewrite rules — including the one that maps
+# an extensionless endpoint (/api/admin/login) to its real file (login.php).
+# Without that, every /api/* call 404s. So we re-declare the .php mapping here.
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # Restore the Authorization header for Bearer-token admin auth.
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Map /api/<endpoint> -> /api/<endpoint>.php (parent rule is not inherited).
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME}\.php -f
+    RewriteRule ^(.+?)/?$ $1.php [L]
 </IfModule>
 <IfModule mod_setenvif.c>
     SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
