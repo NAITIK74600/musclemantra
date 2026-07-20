@@ -529,12 +529,16 @@ export const removeWishlist = (id: string) => {
 // Admin writes go through the bearer-token endpoints below.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Auth headers for admin write calls (bearer session token from the admin panel). */
+/** Auth headers for admin write calls. Sends BOTH the admin-panel bearer
+ *  session token AND the shared admin key — the server checks the key first,
+ *  so uploads/writes stay reliable even if the bearer session has lapsed. */
 function adminHeaders(json = true): Record<string, string> {
   const h: Record<string, string> = {};
   if (json) h['Content-Type'] = 'application/json';
   const t = getAdminToken();
   if (t) h['Authorization'] = `Bearer ${t}`;
+  const key = process.env.NEXT_PUBLIC_ADMIN_SETUP_KEY;
+  if (key) h['x-admin-key'] = key;
   return h;
 }
 
