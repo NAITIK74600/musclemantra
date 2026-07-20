@@ -34,10 +34,14 @@ if ($token) {
     $su->execute([$token]);
     $u = $su->fetch();
     if ($u) {
+        // Logged-in user: return ONLY their own orders. Ignore any device-local IDs
+        // from the query string — those may belong to a different account that was
+        // signed in on this same browser, and must never leak across accounts.
+        $ids = [];
         $so = $db->prepare("SELECT id FROM orders WHERE user_id = ?");
         $so->execute([$u["id"]]);
         foreach ($so->fetchAll() as $row) $ids[] = $row["id"];
-        $ids = array_unique($ids);
+        $ids = array_values(array_unique($ids));
     }
 }
 

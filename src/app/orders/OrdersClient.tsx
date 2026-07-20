@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package, FileText, ShoppingBag, ChevronRight,
   Clock, CheckCircle, Truck, XCircle,
 } from 'lucide-react';
+import { getToken, onAuthChange } from '@/lib/auth';
 
 interface OrderItem {
   id: string;
@@ -94,35 +95,55 @@ export default function OrdersClient() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
+  const load = useCallback(async () => {
+    setLoaded(false);
+    const token = getToken();
+
+    // Logged-in user: fetch ONLY this account's orders (token-scoped on the server).
+    // Never use device-local IDs here — those may belong to a different account
+    // that was signed in on this same browser.
+    if (token) {
       try {
-        // Get order IDs stored on this device
-        const ids: string[] = JSON.parse(localStorage.getItem('mb_order_ids') || '[]');
-        // Migrate legacy orders (stored as full objects)
-        const legacy: Order[] = JSON.parse(localStorage.getItem('mb_orders') || '[]');
-        const legacyIds = legacy.map(o => o.id);
-        const allIds = [...new Set([...ids, ...legacyIds])];
-
-        if (allIds.length === 0) { setLoaded(true); return; }
-
-        // Fetch from server
-        const res = await fetch(`/api/get-orders?ids=${allIds.join(',')}`);
-        if (res.ok) {
-          const data: Record<string, unknown>[] = await res.json();
-          setOrders(Array.isArray(data) ? data.map(normalizeOrder) : []);
-        } else {
-          // Fallback to legacy localStorage orders if API fails
-          setOrders(legacy.slice().reverse().map(o => normalizeOrder(o as unknown as Record<string, unknown>)));
-        }
+        const res = await fetch('/api/get-orders', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data: Record<string, unknown>[] = res.ok ? await res.json() : [];
+        setOrders(Array.isArray(data) ? data.map(normalizeOrder) : []);
       } catch {
-        const legacy: Order[] = JSON.parse(localStorage.getItem('mb_orders') || '[]');
-        setOrders(legacy.slice().reverse().map(o => normalizeOrder(o as unknown as Record<string, unknown>)));
+        setOrders([]);
       }
       setLoaded(true);
-    };
-    load();
+      return;
+    }
+
+    // Guest: fall back to order IDs stored on this device.
+    try {
+      const ids: string[] = JSON.parse(localStorage.getItem('mb_order_ids') || '[]');
+      const legacy: Order[] = JSON.parse(localStorage.getItem('mb_orders') || '[]');
+      const legacyIds = legacy.map(o => o.id);
+      const allIds = [...new Set([...ids, ...legacyIds])];
+
+      if (allIds.length === 0) { setOrders([]); setLoaded(true); return; }
+
+      const res = await fetch(`/api/get-orders?ids=${allIds.join(',')}`);
+      if (res.ok) {
+        const data: Record<string, unknown>[] = await res.json();
+        setOrders(Array.isArray(data) ? data.map(normalizeOrder) : []);
+      } else {
+        setOrders(legacy.slice().reverse().map(o => normalizeOrder(o as unknown as Record<string, unknown>)));
+      }
+    } catch {
+      const legacy: Order[] = JSON.parse(localStorage.getItem('mb_orders') || '[]');
+      setOrders(legacy.slice().reverse().map(o => normalizeOrder(o as unknown as Record<string, unknown>)));
+    }
+    setLoaded(true);
   }, []);
+
+  useEffect(() => {
+    load();
+    // Re-fetch when the user logs in or out so switching accounts never leaks orders.
+    return onAuthChange(() => { load(); });
+  }, [load]);
 
   if (!loaded) {
     return (
