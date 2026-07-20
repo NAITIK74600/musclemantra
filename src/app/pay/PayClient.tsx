@@ -36,6 +36,7 @@ export default function PayClient() {
   const [notFound, setNotFound] = useState(false);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
+  const [autoTried, setAutoTried] = useState(false);
 
   useEffect(() => {
     const m = window.location.search.match(/[?&]order=([^&]+)/);
@@ -62,10 +63,25 @@ export default function PayClient() {
     })();
   }, []);
 
+  // Auto-redirect straight into PayU's secure checkout as soon as the order
+  // loads — scanning the QR should feel like it goes "directly" to PayU with
+  // no extra tap. We can't put PayU's real checkout URL *in* the QR itself
+  // (PayU requires a fresh, server-signed hash per transaction for security,
+  // which a static QR code can't carry), so this page is the unavoidable
+  // one-hop bridge — auto-triggering the redirect closes that gap as much as
+  // possible. The manual button below still works as a fallback/retry.
+  useEffect(() => {
+    if (order && order.status !== 'Payment Received' && !autoTried) {
+      payNow();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order]);
+
   const payNow = async () => {
     if (!order || paying) return;
     setPaying(true);
     setError('');
+    setAutoTried(true);
     try {
       const res = await fetch('/api/payu-hash', {
         method: 'POST',

@@ -117,27 +117,16 @@ export default function InvoiceClient() {
   const [downloading, setDownloading] = useState(false);
   const [payQrDataUrl, setPayQrDataUrl] = useState<string | null>(null);
 
-  // Lazy-load the QR code generator from a CDN (same pattern as the jsPDF
-  // loader below) — keeps the bundle small since not every invoice view
-  // needs it (paid orders skip the "Scan & Pay" QR entirely).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- CDN lib has no bundled types here.
-  const loadQRCodeLib = (): Promise<any> => new Promise((resolve, reject) => {
-    const w = window as unknown as { QRCode?: unknown };
-    if (w.QRCode) { resolve(w.QRCode); return; }
-    const existing = document.getElementById('qrcode-cdn') as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener('load', () => resolve((window as unknown as { QRCode: unknown }).QRCode));
-      existing.addEventListener('error', reject);
-      return;
-    }
-    const s = document.createElement('script');
-    s.id = 'qrcode-cdn';
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js';
-    s.async = true;
-    s.onload = () => resolve((window as unknown as { QRCode: unknown }).QRCode);
-    s.onerror = reject;
-    document.body.appendChild(s);
-  });
+  // Lazy-load the QR code generator from our own bundle (code-split via
+  // dynamic import) instead of an external CDN `<script>` tag — CDN scripts
+  // can silently fail to load (ad-blockers, regional network/firewall
+  // blocking, DNS issues), leaving the QR box blank with no way to recover.
+  // Bundling the `qrcode` package keeps it same-origin and reliable while
+  // still keeping the initial bundle small (only fetched when needed).
+  const loadQRCodeLib = async () => {
+    const mod = await import('qrcode');
+    return mod.default ?? mod;
+  };
 
   useEffect(() => {
     // Resolve the real order id. Static export serves the "_" placeholder page
@@ -408,11 +397,11 @@ export default function InvoiceClient() {
       </div>
 
       {/* Invoice */}
-      <div className="min-h-screen bg-[#050505] py-10 px-4 print:bg-white print:py-0">
-        <div className="max-w-[700px] mx-auto bg-[#111] border border-[rgba(255,255,255,0.06)] rounded-2xl overflow-hidden print:border-0 print:shadow-none print:rounded-none print:bg-white">
+      <div className="min-h-screen print:min-h-0 bg-[#050505] py-10 px-4 print:bg-white print:py-0 print:px-0">
+        <div className="max-w-[700px] print:max-w-none mx-auto bg-[#111] border border-[rgba(255,255,255,0.06)] rounded-2xl overflow-hidden print:border-0 print:shadow-none print:rounded-none print:bg-white">
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-[#1a0a00] to-[#0d0d0d] px-6 sm:px-9 py-8 border-b-2 border-[#FF6B00] print:from-white print:to-white print:border-orange-500">
+          <div className="bg-gradient-to-r from-[#1a0a00] to-[#0d0d0d] px-6 sm:px-9 py-8 print:py-4 border-b-2 border-[#FF6B00] print:from-white print:to-white print:border-orange-500">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <Image src="/logo.png" alt="Muscle Mantra" width={52} height={52} className="rounded-xl shrink-0 w-11 h-11 sm:w-[52px] sm:h-[52px]" />
@@ -431,7 +420,7 @@ export default function InvoiceClient() {
           </div>
 
           {/* Invoice meta */}
-          <div className="px-6 sm:px-9 py-4 grid grid-cols-3 gap-3 border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] print:bg-gray-50 print:border-gray-200">
+          <div className="px-6 sm:px-9 py-4 print:py-2 grid grid-cols-3 gap-3 border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] print:bg-gray-50 print:border-gray-200">
             <div className="min-w-0">
               <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-[rgba(245,245,245,0.35)] print:text-gray-400">Invoice No.</div>
               <div className="text-[12px] sm:text-sm font-bold text-white print:text-black break-all">{order.id}</div>
@@ -447,7 +436,7 @@ export default function InvoiceClient() {
           </div>
 
           {/* Addresses */}
-          <div className="px-6 sm:px-9 py-7 grid grid-cols-2 gap-4 sm:gap-6 border-b border-[rgba(255,255,255,0.06)] print:border-gray-200">
+          <div className="px-6 sm:px-9 py-7 print:py-4 grid grid-cols-2 gap-4 sm:gap-6 border-b border-[rgba(255,255,255,0.06)] print:border-gray-200">
             <div className="min-w-0">
               <div className="text-[10px] font-bold tracking-[2px] uppercase text-[#FF6B00] mb-2">Bill To</div>
               <div className="font-bold text-white text-sm sm:text-base print:text-black break-words">{order.shippingAddress.name}</div>
@@ -467,42 +456,42 @@ export default function InvoiceClient() {
           </div>
 
           {/* Items */}
-          <div className="px-6 sm:px-9 py-6">
+          <div className="px-6 sm:px-9 py-6 print:py-3">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-[#1a1a1a] print:bg-gray-100">
-                  <th className="py-2.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-left print:text-gray-500">Item</th>
-                  <th className="py-2.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-center print:text-gray-500">Qty</th>
-                  <th className="py-2.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-right print:text-gray-500">Rate</th>
-                  <th className="py-2.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-right print:text-gray-500">Amount</th>
+                  <th className="py-2.5 print:py-1.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-left print:text-gray-500">Item</th>
+                  <th className="py-2.5 print:py-1.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-center print:text-gray-500">Qty</th>
+                  <th className="py-2.5 print:py-1.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-right print:text-gray-500">Rate</th>
+                  <th className="py-2.5 print:py-1.5 px-3 text-[10px] font-bold tracking-[1.5px] uppercase text-[rgba(245,245,245,0.4)] text-right print:text-gray-500">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {order.items.map((item, i) => (
                   <tr key={i} className="border-b border-[rgba(255,255,255,0.05)] print:border-gray-100">
-                    <td className="py-3 px-3 text-[rgba(245,245,245,0.85)] print:text-gray-800">{item.name}</td>
-                    <td className="py-3 px-3 text-[rgba(245,245,245,0.5)] text-center print:text-gray-500">{item.quantity}</td>
-                    <td className="py-3 px-3 text-[rgba(245,245,245,0.5)] text-right print:text-gray-500">{formatINR(item.price)}</td>
-                    <td className="py-3 px-3 font-semibold text-white text-right print:text-black">{formatINR(item.price * item.quantity)}</td>
+                    <td className="py-3 print:py-1.5 px-3 text-[rgba(245,245,245,0.85)] print:text-gray-800">{item.name}</td>
+                    <td className="py-3 print:py-1.5 px-3 text-[rgba(245,245,245,0.5)] text-center print:text-gray-500">{item.quantity}</td>
+                    <td className="py-3 print:py-1.5 px-3 text-[rgba(245,245,245,0.5)] text-right print:text-gray-500">{formatINR(item.price)}</td>
+                    <td className="py-3 print:py-1.5 px-3 font-semibold text-white text-right print:text-black">{formatINR(item.price * item.quantity)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
             {/* Payment (Scan & Pay via PayU) + Totals */}
-            <div className="mt-5 grid sm:grid-cols-2 gap-6 items-start">
+            <div className="mt-5 print:mt-3 grid sm:grid-cols-2 gap-6 print:gap-4 items-start">
               {/* Left: payment status / Scan & Pay QR */}
               <div className="min-w-0">
                 {isPaid ? (
-                  <div className="inline-flex items-center gap-2 bg-[rgba(34,197,94,0.1)] border border-[rgba(34,197,94,0.25)] text-green-400 text-[13px] font-bold px-4 py-3 rounded-xl print:bg-green-50 print:border-green-200 print:text-green-700">
+                  <div className="inline-flex items-center gap-2 bg-[rgba(34,197,94,0.1)] border border-[rgba(34,197,94,0.25)] text-green-400 text-[13px] font-bold px-4 py-3 print:py-2 rounded-xl print:bg-green-50 print:border-green-200 print:text-green-700">
                     <CheckCircle2 size={16} className="shrink-0" />
                     Payment Received via {PM_LABELS[order.paymentMethod] ?? order.paymentMethod}
                   </div>
                 ) : (
-                  <div className="bg-[#0d0d0d] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 print:bg-gray-50 print:border-gray-200">
-                    <div className="text-[10px] font-bold tracking-[1.5px] uppercase text-[#FF6B00] mb-3">Scan &amp; Pay via PayU</div>
+                  <div className="bg-[#0d0d0d] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 print:p-3 print:bg-gray-50 print:border-gray-200">
+                    <div className="text-[10px] font-bold tracking-[1.5px] uppercase text-[#FF6B00] mb-3 print:mb-2">Scan &amp; Pay via PayU</div>
                     <div className="flex items-center gap-3">
-                      <div className="w-24 h-24 bg-white rounded-lg p-1.5 shrink-0 flex items-center justify-center overflow-hidden">
+                      <div className="w-24 h-24 print:w-[72px] print:h-[72px] bg-white rounded-lg p-1.5 shrink-0 flex items-center justify-center overflow-hidden">
                         {payQrDataUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={payQrDataUrl} alt="Scan to pay via PayU" className="w-full h-full" />
@@ -550,7 +539,7 @@ export default function InvoiceClient() {
                 <p className="text-[10px] italic text-[rgba(245,245,245,0.35)] pt-1 print:text-gray-400">
                   {numberToWordsINR(order.total)}
                 </p>
-                <div className="pt-8 text-right">
+                <div className="pt-8 print:pt-4 text-right">
                   <div className="italic text-[15px] text-[rgba(245,245,245,0.6)] print:text-gray-600" style={{ fontFamily: 'Georgia, serif' }}>Muscle Mantra</div>
                   <div className="text-[9px] text-[rgba(245,245,245,0.3)] mt-1 pt-1.5 border-t border-[rgba(255,255,255,0.12)] print:text-gray-400 print:border-gray-300">Authorized Signatory</div>
                 </div>
@@ -559,12 +548,12 @@ export default function InvoiceClient() {
           </div>
 
           {/* Footer */}
-          <div className="bg-[#0a0a0a] px-6 sm:px-9 py-6 border-t border-[rgba(255,255,255,0.06)] text-center print:bg-gray-50 print:border-gray-200">
+          <div className="bg-[#0a0a0a] px-6 sm:px-9 py-6 print:py-3 border-t border-[rgba(255,255,255,0.06)] text-center print:bg-gray-50 print:border-gray-200">
             <p className="text-xs text-[rgba(245,245,245,0.3)] print:text-gray-400">Thank you for shopping with Muscle Mantra!</p>
             <p className="text-[11px] text-[rgba(245,245,245,0.25)] mt-1 print:text-gray-400">
               +91 84096 12737 &nbsp;•&nbsp; admin@musclemantra.shop &nbsp;•&nbsp; musclemantra.shop
             </p>
-            <p className="text-[10px] text-[rgba(245,245,245,0.15)] mt-3 print:text-gray-300">
+            <p className="text-[10px] text-[rgba(245,245,245,0.15)] mt-3 print:mt-1.5 print:text-gray-300">
               Muscle Mantra • Patna, Bihar, India
             </p>
             <p className="text-[10px] text-[rgba(245,245,245,0.15)] mt-1 print:text-gray-300">
@@ -577,9 +566,14 @@ export default function InvoiceClient() {
 
       {/* Print styles */}
       <style>{`
+        @page {
+          size: A4;
+          margin: 8mm;
+        }
         @media print {
-          body { background: white !important; }
+          html, body { background: white !important; height: auto !important; }
           nav, footer, .print\\:hidden { display: none !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
     </>

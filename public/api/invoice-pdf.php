@@ -8,6 +8,94 @@
  * Usage:  $bytes = mm_invoice_pdf($order);   // $order = flat order array
  */
 
+if (!function_exists('mm_http_get')) {
+    /** Best-effort HTTP GET (curl if available, else file_get_contents). Returns null on any failure. */
+    function mm_http_get(string $url, int $timeoutSec = 5): ?string {
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => $timeoutSec,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_SSL_VERIFYPEER => true,
+            ]);
+            $body = curl_exec($ch);
+            $ok   = $body !== false && curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200;
+            curl_close($ch);
+            return ($ok && is_string($body) && $body !== '') ? $body : null;
+        }
+        if (ini_get('allow_url_fopen')) {
+            $ctx  = stream_context_create(['http' => ['timeout' => $timeoutSec]]);
+            $body = @file_get_contents($url, false, $ctx);
+            return (is_string($body) && $body !== '') ? $body : null;
+        }
+        return null;
+    }
+}
+
+if (!function_exists('mm_qr_jpeg')) {
+    /**
+     * Fetch a QR code PNG for $data from a public QR API and flatten it to a
+     * white-background JPEG so it can be embedded in our hand-rolled PDF the
+     * same way as the logo (DCTDecode image XObject). Returns null on any
+     * failure (missing GD, network error, etc.) — caller must treat as optional.
+     */
+    function mm_qr_jpeg(string $data, int $size = 220): ?array {
+        if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) return null;
+        $url = 'https://api.qrserver.com/v1/create-qr-code/?size=' . $size . 'x' . $size
+             . '&margin=0&data=' . rawurlencode($data);
+        $png = mm_http_get($url);
+        if (!$png) return null;
+        $im = @imagecreatefromstring($png);
+        if (!$im) return null;
+        $w  = imagesx($im); $h = imagesy($im);
+        $bg = imagecreatetruecolor($w, $h);
+        imagefill($bg, 0, 0, imagecolorallocate($bg, 255, 255, 255));
+        imagecopy($bg, $im, 0, 0, 0, 0, $w, $h);
+        imagedestroy($im);
+        ob_start();
+        imagejpeg($bg, null, 90);
+        $jpeg = (string) ob_get_clean();
+        imagedestroy($bg);
+        if ($jpeg === '') return null;
+        return ['bytes' => $jpeg, 'w' => $w, 'h' => $h];
+    }
+}
+
+if (!function_exists('mm_num2words_indian')) {
+    /** Convert a rupee amount to words, Indian numbering (crore/lakh/thousand). */
+    function mm_num2words_indian(float $amount): string {
+        $amount = (int) round($amount);
+        if ($amount <= 0) return 'Zero Rupees Only';
+        $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+                  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+                  'Seventeen', 'Eighteen', 'Nineteen'];
+        $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        $twoDigit = static function (int $n) use ($ones, $tens): string {
+            if ($n < 20) return $ones[$n];
+            $t = intdiv($n, 10); $r = $n % 10;
+            return trim($tens[$t] . ($r ? ' ' . $ones[$r] : ''));
+        };
+        $threeDigit = static function (int $n) use ($ones, $twoDigit): string {
+            $h = intdiv($n, 100); $r = $n % 100;
+            $parts = [];
+            if ($h) $parts[] = $ones[$h] . ' Hundred';
+            if ($r) $parts[] = $twoDigit($r);
+            return implode(' ', $parts);
+        };
+        $crore    = intdiv($amount, 10000000);
+        $lakh     = intdiv($amount % 10000000, 100000);
+        $thousand = intdiv($amount % 100000, 1000);
+        $hundred  = $amount % 1000;
+        $parts = [];
+        if ($crore)    $parts[] = $threeDigit($crore) . ' Crore';
+        if ($lakh)     $parts[] = $threeDigit($lakh) . ' Lakh';
+        if ($thousand) $parts[] = $threeDigit($thousand) . ' Thousand';
+        if ($hundred)  $parts[] = $threeDigit($hundred);
+        return implode(' ', $parts) . ' Rupees Only';
+    }
+}
+
 if (!function_exists('mm_invoice_pdf')) {
 
     function mm_invoice_pdf(array $o): string {
@@ -78,13 +166,16 @@ if (!function_exists('mm_invoice_pdf')) {
         }
 
         $white = '0.95 0.95 0.95';
-        $textR($W - $M, $H - 46, 10, 'F2', 'INVOICE', $orange);
-        $textR($W - $M, $H - 66, 16, 'F2', '#' . ($o['id'] ?? ''), $white);
+        $textR($W - $M, $H - 42, 10, 'F2', 'TAX INVOICE', $orange);
+        $textR($W - $M, $H - 58, 7.5, 'F1', 'ORIGINAL FOR RECIPIENT', '0.55 0.55 0.55');
+        $textR($W - $M, $H - 76, 15, 'F2', '#' . ($o['id'] ?? ''), $white);
         $rawDate = (string)($o['created_at'] ?? $o['createdAt'] ?? '');
         $ts = $rawDate ? strtotime($rawDate) : false;
-        $textR($W - $M, $H - 84, 9, 'F1', date('d M Y', $ts ?: time()), '0.6 0.6 0.6');
+        $textR($W - $M, $H - 94, 9, 'F1', date('d M Y', $ts ?: time()), '0.6 0.6 0.6');
 
-        $y = $H - $bandH - 34;
+        $y = $H - $bandH - 20;
+        $text($M, $y, 8, 'F2', 'GSTIN: 10LIYPK4956L1ZC', '0.7 0.7 0.7');
+        $y -= 24;
 
         // ── Bill To / Ship To ────────────────────────────────────────────
         $text($M, $y, 9, 'F2', 'BILL TO', $orange);
@@ -111,7 +202,7 @@ if (!function_exists('mm_invoice_pdf')) {
         $qtyX = $W - $M - 210; $unitX = $W - $M - 110; $amtX = $W - $M - 6;
         $text($M + 6, $y, 8, 'F2', 'ITEM', $gray);
         $textR($qtyX, $y, 8, 'F2', 'QTY', $gray);
-        $textR($unitX, $y, 8, 'F2', 'UNIT', $gray);
+        $textR($unitX, $y, 8, 'F2', 'RATE', $gray);
         $textR($amtX, $y, 8, 'F2', 'AMOUNT', $gray);
         $y -= 26;
 
@@ -151,35 +242,101 @@ if (!function_exists('mm_invoice_pdf')) {
         $y -= 4;
         $trow('Grand Total', 'Rs ' . number_format($total), true);
 
-        // ── Payment + footer ─────────────────────────────────────────────
-        $y -= 16;
+        // ── Amount in words ───────────────────────────────────────────────
+        $y -= 18;
+        foreach (explode("\n", wordwrap('Amount in words: ' . mm_num2words_indian($total), 78, "\n", true)) as $i => $line) {
+            $text($M, $y - ($i * 11), 8, 'F1', $line, $gray);
+        }
+
+        // ── Payment status / Scan & Pay QR + Signature ────────────────────
+        $y -= 46;
+        $blockTop = $y;
         $pmMap = [
             'cod' => 'Cash on Delivery', 'upi' => 'UPI',
-            'card' => 'Credit / Debit Card', 'netbanking' => 'Net Banking',
+            'card' => 'Credit / Debit Card', 'netbanking' => 'Net Banking', 'payu' => 'PayU',
         ];
         $pm = (string)($o['payment_method'] ?? '');
-        $pm = $pmMap[$pm] ?? $pm;
-        $text($M, $y, 9, 'F1', 'Payment: ' . $pm . '    Status: ' . (string)($o['status'] ?? ''), $gray);
-        $y -= 34;
+        $pmLabel = $pmMap[$pm] ?? $pm;
+        $statusLower = strtolower((string)($o['status'] ?? ''));
+        // Treat "Payment Received" (verified online payment) AND "Delivered"
+        // (COD cash already collected) as settled — no QR needed once either is true.
+        $isSettled = (strpos($statusLower, 'payment received') !== false)
+            || (strpos($statusLower, 'delivered') !== false);
+
+        $hasQr = false; $qrBytes = ''; $qrW = 0; $qrH = 0;
+        if (!$isSettled) {
+            $orderId = (string)($o['id'] ?? '');
+            $payUrl  = SITE_URL . '/pay?order=' . rawurlencode($orderId);
+            $qr = mm_qr_jpeg($payUrl, 220);
+            if ($qr) { $hasQr = true; $qrBytes = $qr['bytes']; $qrW = $qr['w']; $qrH = $qr['h']; }
+        }
+
+        if ($isSettled) {
+            $text($M, $blockTop, 9, 'F2', 'PAYMENT RECEIVED', '0.13 0.55 0.28');
+            $text($M, $blockTop - 15, 8, 'F1', 'via ' . ($pmLabel !== '' ? $pmLabel : 'N/A'), $gray);
+        } elseif ($hasQr) {
+            $qrSize = 76;
+            $c .= 'q ' . $qrSize . ' 0 0 ' . $qrSize . ' ' . $M . ' ' . ($blockTop - $qrSize + 6) . " cm /Im2 Do Q\n";
+            $capX = $M + $qrSize + 12;
+            $text($capX, $blockTop, 8.5, 'F2', 'SCAN & PAY VIA PAYU', $orange);
+            $capLines = explode("\n", wordwrap(
+                'Scan with your phone camera to pay Rs ' . number_format($total) . ' securely via PayU.',
+                32, "\n", true
+            ));
+            foreach ($capLines as $i => $line) {
+                $text($capX, $blockTop - 15 - ($i * 11), 7.5, 'F1', $line, $gray);
+            }
+        } else {
+            $text($M, $blockTop, 8, 'F2', 'PAY ONLINE VIA PAYU', $orange);
+            $text($M, $blockTop - 15, 7.5, 'F1', SITE_URL . '/pay?order=' . ($o['id'] ?? ''), $gray);
+        }
+
+        // Signature block — right side, aligned with the payment block.
+        $sigW = 150; $sigX = $W - $M - $sigW;
+        $text($sigX, $blockTop, 12, 'F1', 'Muscle Mantra', $dark);
+        $rect($sigX, $blockTop - 34, $sigW, 0.6, '0.75 0.75 0.75');
+        $text($sigX, $blockTop - 46, 7.5, 'F1', 'Authorized Signatory', $gray);
+
+        $y = $blockTop - 78;
+
+        // ── Footer ─────────────────────────────────────────────────────
         $text($M, $y, 8, 'F1', 'Thank you for shopping with Muscle Mantra!', $gray);
         $y -= 12;
         $text($M, $y, 8, 'F1', '+91 84096 12737  -  admin@musclemantra.shop  -  musclemantra.shop', $gray);
+        $y -= 12;
+        $text($M, $y, 7.5, 'F1', 'GSTIN: 10LIYPK4956L1ZC  -  This is a computer-generated invoice and does not require a signature.', '0.55 0.55 0.55');
 
         // ── Assemble the PDF document ────────────────────────────────────
         $objects = [];
         $objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
         $objects[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
-        $xobjRes = $hasLogo ? ' /XObject << /Im1 7 0 R >>' : '';
+
+        // Object numbers for optional images are assigned contiguously so the
+        // xref table below (which assumes objects 1..N with no gaps) stays valid
+        // whether the logo, the QR, both, or neither ended up being embeddable.
+        $xobjEntries = [];
+        $nextObj = 7;
+        $logoObjNum = null; $qrObjNum = null;
+        if ($hasLogo) { $logoObjNum = $nextObj++; $xobjEntries[] = '/Im1 ' . $logoObjNum . ' 0 R'; }
+        if ($hasQr)   { $qrObjNum   = $nextObj++; $xobjEntries[] = '/Im2 ' . $qrObjNum . ' 0 R'; }
+        $xobjRes = $xobjEntries ? (' /XObject << ' . implode(' ', $xobjEntries) . ' >>') : '';
+
         $objects[3] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' . $W . ' ' . $H . ']'
             . ' /Resources << /Font << /F1 5 0 R /F2 6 0 R >>' . $xobjRes . ' >> /Contents 4 0 R >>';
         $objects[4] = '<< /Length ' . strlen($c) . " >>\nstream\n" . $c . "endstream";
         $objects[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
         $objects[6] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
         if ($hasLogo) {
-            $objects[7] = '<< /Type /XObject /Subtype /Image /Width ' . $imgW
+            $objects[$logoObjNum] = '<< /Type /XObject /Subtype /Image /Width ' . $imgW
                 . ' /Height ' . $imgH . ' /ColorSpace /DeviceRGB /BitsPerComponent 8'
                 . ' /Filter /DCTDecode /Length ' . strlen($logoBytes) . " >>\nstream\n"
                 . $logoBytes . "\nendstream";
+        }
+        if ($hasQr) {
+            $objects[$qrObjNum] = '<< /Type /XObject /Subtype /Image /Width ' . $qrW
+                . ' /Height ' . $qrH . ' /ColorSpace /DeviceRGB /BitsPerComponent 8'
+                . ' /Filter /DCTDecode /Length ' . strlen($qrBytes) . " >>\nstream\n"
+                . $qrBytes . "\nendstream";
         }
 
         $pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";

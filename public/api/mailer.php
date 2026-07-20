@@ -289,10 +289,12 @@ if (!function_exists('mm_send_mail')) {
             ? '<p style="color:rgba(245,245,245,0.45);font-size:12px;line-height:1.5;margin:14px 0 0">Delivering to:<br>' . $addr . '</p>'
             : '';
 
-        // Attach the invoice PDF ONLY on the delivered email — not on every status update.
-        // (Best-effort — never fails the email.)
+        // Attach the invoice PDF on order confirmation (shows the PayU "Scan &
+        // Pay" QR while the order is unpaid) and again on delivery (QR is
+        // automatically hidden by mm_invoice_pdf() once the order is settled).
+        // Not attached on plain status/OTP updates. (Best-effort — never fails the email.)
         $invoiceAttachment = [];
-        if ($kind === 'delivered') {
+        if ($kind === 'delivered' || $kind === 'confirmation') {
             try {
                 $pdfBytes = mm_invoice_pdf($o);
                 if (is_string($pdfBytes) && $pdfBytes !== '') {
