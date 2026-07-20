@@ -6,7 +6,8 @@ $db = getDB();
 // Admin: return all orders. Accept either the shared admin key (legacy) OR a
 // logged-in admin's bearer session token (preferred — no static key in the client).
 $isAdmin  = false;
-$adminKey = $_SERVER["HTTP_X_ADMIN_KEY"] ?? "";
+$adminKey = $_SERVER["HTTP_X_ADMIN_KEY"] ?? ($_GET["admin_key"] ?? "");
+$bt       = null;
 if ($adminKey !== "" && ADMIN_KEY !== "" && hash_equals(ADMIN_KEY, $adminKey)) {
     $isAdmin = true;
 } else {
@@ -29,6 +30,15 @@ if ($isAdmin) {
         $o["total"] = (float)$o["total"];
     }
     ok($orders);
+}
+
+// The admin panel explicitly marks its request with ?scope=admin. If that flag
+// is present but the request above did NOT qualify as admin, this is an admin
+// auth failure (expired/missing session, or the Authorization header didn't
+// reach PHP on this host) — fail loudly instead of silently falling through to
+// the "regular customer" branch below and returning a misleading empty list.
+if (($_GET["scope"] ?? "") === "admin") {
+    fail("Admin access required or session expired. Please log in again.", 403);
 }
 
 // User: collect IDs from query string + auth session

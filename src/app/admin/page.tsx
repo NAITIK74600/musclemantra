@@ -777,7 +777,7 @@ function AdminDashboard() {
   const fetchOrders = useCallback(async () => {
     setOrdersLoading(true);
     try {
-      const res = await fetch('/api/get-orders', {
+      const res = await fetch('/api/get-orders?scope=admin', {
         headers: authHeaders(false),
       });
       if (res.ok) {
