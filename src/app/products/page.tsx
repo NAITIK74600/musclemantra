@@ -2,8 +2,9 @@
 
 import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SlidersHorizontal, Search, X } from 'lucide-react';
+import { SlidersHorizontal, Search, X, LayoutGrid } from 'lucide-react';
 import { getProducts, getCategories, onStoreChange, type AdminProduct, type AdminCategory } from '@/lib/store';
 import ProductCard from '@/components/ProductCard';
 
@@ -107,18 +108,36 @@ function ProductsPageInner() {
           </div>
         </div>
 
-        {/* Category pills */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
+        {/* Category circles */}
+        <div className="flex items-start gap-3 sm:gap-4 overflow-x-auto pb-3 mb-6 scrollbar-hide">
+          {/* All */}
           <button onClick={() => setSelectedCategory('all')}
-            className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all ${selectedCategory === 'all' ? 'bg-[#FF6B00] text-white' : 'bg-[#111] border border-[rgba(255,255,255,0.08)] text-[rgba(245,245,245,0.6)] hover:border-[rgba(255,107,0,0.3)]'}`}>
-            All
+            className="shrink-0 flex flex-col items-center gap-2 w-[64px] sm:w-[72px] group">
+            <span className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center border-2 transition-all ${selectedCategory === 'all' ? 'border-[#FF6B00] bg-[rgba(255,107,0,0.12)]' : 'border-[rgba(255,255,255,0.1)] bg-[#111] group-hover:border-[rgba(255,107,0,0.4)]'}`}>
+              <LayoutGrid size={22} className={selectedCategory === 'all' ? 'text-[#FF6B00]' : 'text-[rgba(245,245,245,0.55)]'} />
+            </span>
+            <span className={`text-[11px] font-semibold text-center leading-tight line-clamp-2 ${selectedCategory === 'all' ? 'text-[#FF6B00]' : 'text-[rgba(245,245,245,0.6)]'}`}>All</span>
           </button>
-          {visibleCategories.map(cat => (
-            <button key={cat.id} onClick={() => setSelectedCategory(selectedCategory === cat.id ? 'all' : cat.id)}
-              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all ${selectedCategory === cat.id ? 'bg-[#FF6B00] text-white' : 'bg-[#111] border border-[rgba(255,255,255,0.08)] text-[rgba(245,245,245,0.6)] hover:border-[rgba(255,107,0,0.3)]'}`}>
-              <span>{cat.icon}</span> {cat.label}
-            </button>
-          ))}
+
+          {visibleCategories.map(cat => {
+            const active = selectedCategory === cat.id;
+            const isDataUrl = (cat.image ?? '').startsWith('data:');
+            return (
+              <button key={cat.id} onClick={() => setSelectedCategory(active ? 'all' : cat.id)}
+                className="shrink-0 flex flex-col items-center gap-2 w-[64px] sm:w-[72px] group">
+                <span className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden flex items-center justify-center border-2 transition-all ${active ? 'border-[#FF6B00]' : 'border-[rgba(255,255,255,0.1)] group-hover:border-[rgba(255,107,0,0.4)]'}`}
+                  style={{ background: cat.image ? '#111' : `${cat.color}22` }}>
+                  {cat.image ? (
+                    <Image src={cat.image} alt={cat.label} fill unoptimized={isDataUrl}
+                      className="object-cover" sizes="64px" />
+                  ) : (
+                    <span className="text-2xl" style={{ color: cat.color }}>{cat.icon}</span>
+                  )}
+                </span>
+                <span className={`text-[11px] font-semibold text-center leading-tight line-clamp-2 ${active ? 'text-[#FF6B00]' : 'text-[rgba(245,245,245,0.6)]'}`}>{cat.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Filter drawer */}

@@ -161,7 +161,7 @@ function HeroSection() {
             {/* Subcopy — clearly explains the app's purpose for OAuth verification */}
             <ClientMotion as="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
               className="text-white/70 text-[14.5px] sm:text-base md:text-lg mb-6 sm:mb-7 leading-relaxed max-w-lg">
-              <strong className="text-white/90 font-semibold">Muscle Mantra</strong> is an online supplement e-commerce store based in India. Browse and buy 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA — no login required to shop.
+              <strong className="text-white/90 font-semibold">Muscle Mantra</strong> is an online supplement e-commerce store based in India. Shop 100% authentic whey protein, creatine, pre-workout, mass gainer &amp; BCAA — sourced directly from official brands, with unbeatable prices and fast doorstep delivery across India.
             </ClientMotion>
 
             {/* CTAs */}
