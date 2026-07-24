@@ -139,20 +139,26 @@ export default function InvoiceClient() {
     if (!orderId || orderId === '_') { setNotFound(true); return; }
 
     const load = async () => {
-      // 1. Try localStorage legacy first (fast, offline-capable)
-      try {
-        const orders: Order[] = JSON.parse(localStorage.getItem('mb_orders') || '[]');
-        const found = orders.find(o => o.id === orderId);
-        if (found) { setOrder(normalizeOrder(found as unknown as Record<string, unknown>)); return; }
-      } catch { /* ignore */ }
-
-      // 2. Fetch from server API
+      // 1. Fetch the live order from the server FIRST — it's the only source
+      // of truth for payment status (PayU's callback updates the status
+      // straight in the database, never in this browser's localStorage).
+      // A stale localStorage copy saved at checkout time (e.g. "Payment
+      // Pending") would otherwise keep showing "Unpaid" on the invoice even
+      // after the payment actually succeeded.
       try {
         const res = await fetch(`/api/get-orders?ids=${encodeURIComponent(orderId)}`);
         if (res.ok) {
           const data: Record<string, unknown>[] = await res.json();
           if (Array.isArray(data) && data.length > 0) { setOrder(normalizeOrder(data[0])); return; }
         }
+      } catch { /* ignore — fall back to local copy below */ }
+
+      // 2. Fall back to localStorage only if the server is unreachable
+      // (e.g. offline) — this copy may have a stale payment status.
+      try {
+        const orders: Order[] = JSON.parse(localStorage.getItem('mb_orders') || '[]');
+        const found = orders.find(o => o.id === orderId);
+        if (found) { setOrder(normalizeOrder(found as unknown as Record<string, unknown>)); return; }
       } catch { /* ignore */ }
 
       setNotFound(true);
@@ -197,6 +203,18 @@ export default function InvoiceClient() {
   }
 
   const subtotal = order.total - (order.shipping ?? 0) + (order.discount ?? 0);
+  // Product prices are GST-inclusive (MRP) — see ProductDetailClient's
+  // "Inclusive of all taxes" note — so the 18% GST (9% CGST + 9% SGST) is
+  // back-calculated out of the post-discount, pre-shipping amount for the
+  // tax breakdown shown on the invoice. taxableValue + CGST + SGST always
+  // equals (order.total - shipping), so the totals still reconcile exactly.
+  const discountAmt = order.discount ?? 0;
+  const discountPercent = subtotal > 0 ? Math.round((discountAmt / subtotal) * 100) : 0;
+  const taxableBase = order.total - (order.shipping ?? 0);
+  const taxableValue = taxableBase / 1.18;
+  const gstAmount = taxableBase - taxableValue;
+  const cgst = gstAmount / 2;
+  const sgst = gstAmount / 2;
   const dateObj = order.createdAt ? new Date(order.createdAt) : null;
   const date = dateObj && !isNaN(dateObj.getTime())
     ? dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -310,7 +328,10 @@ export default function InvoiceClient() {
         y += bold ? 20 : 15;
       };
       totRow('Subtotal', rupee(subtotal));
-      if (order.discount) totRow('Discount', '- ' + rupee(order.discount));
+      if (discountAmt) totRow(`Discount${discountPercent > 0 ? ` (${discountPercent}%)` : ''}`, '- ' + rupee(discountAmt));
+      totRow('Taxable Value', rupee(taxableValue));
+      totRow('CGST @ 9%', rupee(cgst));
+      totRow('SGST @ 9%', rupee(sgst));
       totRow('Shipping', order.shipping ? rupee(order.shipping) : 'FREE');
       totRow('Grand Total', rupee(order.total), true);
 
@@ -518,6 +539,20 @@ export default function InvoiceClient() {
                 <div className="flex justify-between text-sm text-[rgba(245,245,245,0.55)] print:text-gray-500">
                   <span>Subtotal</span><span>{formatINR(subtotal)}</span>
                 </div>
+                {discountAmt > 0 && (
+                  <div className="flex justify-between text-sm text-green-400">
+                    <span>Discount{discountPercent > 0 ? ` (${discountPercent}%)` : ''}</span><span>−{formatINR(discountAmt)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm text-[rgba(245,245,245,0.55)] print:text-gray-500">
+                  <span>Taxable Value</span><span>{formatINR(taxableValue)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-[rgba(245,245,245,0.55)] print:text-gray-500">
+                  <span>CGST @ 9%</span><span>{formatINR(cgst)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-[rgba(245,245,245,0.55)] print:text-gray-500">
+                  <span>SGST @ 9%</span><span>{formatINR(sgst)}</span>
+                </div>
                 {(order.shipping ?? 0) > 0 ? (
                   <div className="flex justify-between text-sm text-[rgba(245,245,245,0.55)] print:text-gray-500">
                     <span>Shipping</span><span>{formatINR(order.shipping ?? 0)}</span>
@@ -527,17 +562,15 @@ export default function InvoiceClient() {
                     <span>Shipping</span><span>Free</span>
                   </div>
                 )}
-                {(order.discount ?? 0) > 0 && (
-                  <div className="flex justify-between text-sm text-green-400">
-                    <span>Discount (5%)</span><span>−{formatINR(order.discount ?? 0)}</span>
-                  </div>
-                )}
                 <div className="border-t border-[rgba(255,255,255,0.1)] pt-3 flex justify-between items-center print:border-gray-200">
                   <span className="font-[var(--font-montserrat)] font-black text-base text-white print:text-black">Total</span>
                   <span className="font-[var(--font-montserrat)] font-black text-xl text-[#FF6B00]">{formatINR(order.total)}</span>
                 </div>
                 <p className="text-[10px] italic text-[rgba(245,245,245,0.35)] pt-1 print:text-gray-400">
                   {numberToWordsINR(order.total)}
+                </p>
+                <p className="text-[9px] text-[rgba(245,245,245,0.3)] print:text-gray-400">
+                  (Total GST included: {formatINR(gstAmount)})
                 </p>
                 <div className="pt-8 print:pt-4 text-right">
                   <div className="italic text-[15px] text-[rgba(245,245,245,0.6)] print:text-gray-600" style={{ fontFamily: 'Georgia, serif' }}>Muscle Mantra</div>

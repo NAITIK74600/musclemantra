@@ -227,6 +227,14 @@ if (!function_exists('mm_invoice_pdf')) {
         $discount = (float)($o['discount'] ?? 0);
         $shipping = (float)($o['shipping'] ?? 0);
         $total    = (float)($o['total'] ?? ($subtotal - $discount + $shipping));
+        // Prices are GST-inclusive (MRP), so the 18% GST (9% CGST + 9% SGST)
+        // is back-calculated out of the post-discount, pre-shipping amount.
+        $taxableBase  = $total - $shipping;
+        $taxableValue = $taxableBase / 1.18;
+        $gstAmount    = $taxableBase - $taxableValue;
+        $cgst = $gstAmount / 2;
+        $sgst = $gstAmount / 2;
+        $discountPct = $subtotal > 0 ? round(($discount / $subtotal) * 100) : 0;
         $labelX = $W - $M - 150; $valX = $W - $M - 6;
         $trow = static function ($label, $val, $bold = false)
             use (&$y, $textR, $labelX, $valX, $dark, $orange, $gray) {
@@ -236,7 +244,10 @@ if (!function_exists('mm_invoice_pdf')) {
             $y -= $bold ? 22 : 16;
         };
         $trow('Subtotal', 'Rs ' . number_format($subtotal));
-        if ($discount > 0) $trow('Discount', '- Rs ' . number_format($discount));
+        if ($discount > 0) $trow('Discount' . ($discountPct > 0 ? " ({$discountPct}%)" : ''), '- Rs ' . number_format($discount));
+        $trow('Taxable Value', 'Rs ' . number_format($taxableValue));
+        $trow('CGST @ 9%', 'Rs ' . number_format($cgst));
+        $trow('SGST @ 9%', 'Rs ' . number_format($sgst));
         $trow('Shipping', $shipping > 0 ? 'Rs ' . number_format($shipping) : 'FREE');
         $rect($labelX - 4, $y + 8, ($valX - $labelX) + 14, 0.6, '0.75 0.75 0.75');
         $y -= 4;
