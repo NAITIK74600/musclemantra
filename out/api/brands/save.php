@@ -15,6 +15,10 @@ $slug = trim((string)$slug, '-');
 if ($slug === '') fail('Invalid brand id');
 $id = substr($slug, 0, 50);
 
+// Kept at 500 to match the `brands.logo_url VARCHAR(500)` column — real
+// uploaded/pasted image URLs are always well under this, so it's only ever
+// a safety clamp now (not a source of silent corruption like it used to be
+// when giant base64 data-URLs were sent here).
 $logo = substr(trim((string)($d['logo'] ?? '')), 0, 500);
 
 getDB()->prepare(

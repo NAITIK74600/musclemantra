@@ -12,7 +12,7 @@ import {
   MessageSquare, Save, Plus, Image as ImageIcon,
   Megaphone, Film, Upload, Download, Award, Play, LayoutGrid, Minus,
   Loader2, KeyRound, Shield, UserPlus, MailCheck, Crown,
-  Dumbbell, Calendar, Clock, Phone, RefreshCw, Menu,
+  Dumbbell, Calendar, Clock, Phone, RefreshCw, Menu, Link2,
 } from 'lucide-react';
 import {
   getBrands, saveBrands, getPromos, savePromos, fileToDataURL, uid,
@@ -409,13 +409,26 @@ function TrainersSection() {
 
   const onTrainerImage = async (file: File | undefined) => {
     if (!file || !tEdit) return;
-    const url = await fileToDataURL(file);
+    // Upload to the server (short real https URL) instead of a base64
+    // data-URL — large base64 blobs could blow past the browser's
+    // localStorage quota, silently failing to save and making the image
+    // look like it "disappeared" after upload.
+    const url = await uploadImageToServer(file, 'trainer', tEdit.id || undefined);
+    if (!url) { toast.push({ variant: 'error', title: 'Image upload failed', description: 'Check your connection and try again.' }); return; }
     setTEdit({ ...tEdit, image: url });
   };
 
   // ── Plan editor ───────────────────────────────────────────────────────
   const [pEdit, setPEdit] = useState<TrainingPlan | null>(null);
   const blankPlan: TrainingPlan = { id: '', name: '', tagline: '', price: 0, oldPrice: 0, period: 'per month', features: [], popular: false, active: true };
+  // Raw text buffer for the newline-separated Features textarea — kept
+  // separate from `pEdit.features` (not derived from the array on every
+  // keystroke) because re-deriving `value` from the filtered array strips
+  // the newline the instant Enter is pressed, making it impossible to
+  // actually start a new feature line.
+  const [featuresText, setFeaturesText] = useState('');
+  const openNewPlan = () => { setPEdit(blankPlan); setFeaturesText(''); };
+  const openEditPlan = (p: TrainingPlan) => { setPEdit(p); setFeaturesText(p.features.join('\n')); };
 
   const savePlan = () => {
     if (!pEdit) return;
@@ -527,7 +540,7 @@ function TrainersSection() {
       {tab === 'plans' && (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <button onClick={() => setPEdit(blankPlan)}
+            <button onClick={openNewPlan}
               className="flex items-center gap-2 px-4 py-2.5 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-sm font-bold rounded-xl transition-all">
               <PlusCircle size={15} /> Add plan
             </button>
@@ -547,7 +560,7 @@ function TrainersSection() {
                 </div>
                 <p className="text-[11px] text-[rgba(245,245,245,0.4)] mt-1">{p.features.length} feature(s){p.active ? '' : ' · hidden'}</p>
                 <div className="mt-3 flex gap-2">
-                  <button onClick={() => setPEdit(p)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-[rgba(255,255,255,0.1)] text-white text-xs font-bold rounded-lg hover:border-[#FF6B00] transition-all"><Edit2 size={12} /> Edit</button>
+                  <button onClick={() => openEditPlan(p)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-[rgba(255,255,255,0.1)] text-white text-xs font-bold rounded-lg hover:border-[#FF6B00] transition-all"><Edit2 size={12} /> Edit</button>
                   <button onClick={() => { if (confirm(`Delete ${p.name}?`)) deletePlan(p.id); }} className="p-2 text-[rgba(245,245,245,0.3)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={14} /></button>
                 </div>
               </div>
@@ -611,7 +624,12 @@ function TrainersSection() {
                 <input className={inputCls} placeholder="Period" value={pEdit.period} onChange={e => setPEdit({ ...pEdit, period: e.target.value })} />
               </div>
               <textarea className={inputCls + ' resize-none'} rows={5} placeholder="Features — one per line"
-                value={pEdit.features.join('\n')} onChange={e => setPEdit({ ...pEdit, features: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })} />
+                value={featuresText}
+                onChange={e => {
+                  const v = e.target.value;
+                  setFeaturesText(v);
+                  setPEdit({ ...pEdit, features: v.split('\n').map(s => s.trim()).filter(Boolean) });
+                }} />
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
                   <input type="checkbox" checked={pEdit.popular} onChange={e => setPEdit({ ...pEdit, popular: e.target.checked })} /> Most popular
@@ -1033,10 +1051,22 @@ function AdminDashboard() {
   // Brand form
   const [brandForm, setBrandForm] = useState({ name: '', short: '', logo: '' });
   const brandFileRef = useRef<HTMLInputElement>(null);
+  // Upload to the server so the logo gets a short, real https URL that
+  // persists — a base64 data-URL is huge and was getting silently truncated
+  // to 500 chars by the brands API (corrupting the image), which then got
+  // wiped out the next time the brand list synced from the server.
   const onBrandLogo = async (file?: File) => {
     if (!file) return;
-    const url = await fileToDataURL(file);
+    const url = await uploadImageToServer(file, 'brand');
+    if (!url) { toast.push({ variant: 'error', title: 'Logo upload failed', description: 'Check your connection and try again.' }); return; }
     setBrandForm(f => ({ ...f, logo: url }));
+  };
+  const [brandLogoUrlInput, setBrandLogoUrlInput] = useState('');
+  const addBrandLogoUrlToForm = (raw: string) => {
+    const val = raw.trim();
+    if (!val) return;
+    setBrandForm(f => ({ ...f, logo: val }));
+    setBrandLogoUrlInput('');
   };
   const addBrand = () => {
     if (!brandForm.name.trim()) return;
@@ -1099,6 +1129,24 @@ function AdminDashboard() {
   const openNewProduct = () => setProductDraft(emptyProduct());
   const openEditProduct = (p: AdminProduct) => setProductDraft({ ...p, images: p.images?.length ? p.images : (p.image ? [p.image] : []) });
   const closeProductModal = () => setProductDraft(null);
+
+  // Raw text buffers for the comma-separated Flavors/Sizes/Tags inputs. Kept
+  // separate from `productDraft.flavors` etc. (and NOT derived from the array
+  // on every keystroke) because re-deriving `value` from the trimmed/filtered
+  // array while typing strips a trailing comma/space the instant it's typed
+  // — which made it impossible to actually type multiple comma-separated
+  // values. Only re-seeded from the array when a different product is opened.
+  const [flavorsText, setFlavorsText] = useState('');
+  const [sizesText, setSizesText] = useState('');
+  const [tagsText, setTagsText] = useState('');
+  useEffect(() => {
+    if (productDraft) {
+      setFlavorsText(productDraft.flavors.join(', '));
+      setSizesText(productDraft.sizes.join(', '));
+      setTagsText(productDraft.tags.join(', '));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productDraft?.id]);
 
   const onProductImagesPick = async (files: FileList | null) => {
     if (!productDraft || !files || !files.length) return;
@@ -1480,17 +1528,45 @@ function AdminDashboard() {
   };
   const onBrandLogoEditFile = async (file?: File) => {
     if (!file || !brandLogoTargetId) return;
-    const url = await fileToDataURL(file);
+    const url = await uploadImageToServer(file, 'brand', brandLogoTargetId);
+    if (!url) {
+      toast.push({ variant: 'error', title: 'Logo upload failed', description: 'Check your connection and try again.' });
+      if (brandEditFileRef.current) brandEditFileRef.current.value = '';
+      setBrandLogoTargetId(null);
+      return;
+    }
     const updated = updateBrand(brandLogoTargetId, { logo: url });
     setBrandList(getBrands());
-    if (updated) toast.push({ variant: 'success', title: 'Logo updated', description: updated.name });
+    if (updated) {
+      // Persist to the server too — local-only edits were silently reverted
+      // the next time the brand list synced from the server.
+      void saveBrandServer({ id: updated.id, name: updated.name, logo: updated.logo ?? '' });
+      toast.push({ variant: 'success', title: 'Logo updated', description: updated.name });
+    }
     if (brandEditFileRef.current) brandEditFileRef.current.value = '';
     setBrandLogoTargetId(null);
   };
   const clearBrandLogo = (id: string) => {
     const updated = updateBrand(id, { logo: undefined });
     setBrandList(getBrands());
-    if (updated) toast.push({ variant: 'info', title: 'Logo removed', description: updated.name });
+    if (updated) {
+      void saveBrandServer({ id: updated.id, name: updated.name, logo: '' });
+      toast.push({ variant: 'info', title: 'Logo removed', description: updated.name });
+    }
+  };
+  /** Prompt for a logo image URL and apply it to an existing brand (persisted to the server). */
+  const promptBrandLogoUrl = (id: string) => {
+    const b = brandList.find(x => x.id === id);
+    if (!b) return;
+    const val = window.prompt('Paste the brand logo image URL:', b.logo ?? '');
+    if (val === null) return; // cancelled
+    const trimmed = val.trim();
+    const updated = updateBrand(id, { logo: trimmed || undefined });
+    setBrandList(getBrands());
+    if (updated) {
+      void saveBrandServer({ id: updated.id, name: updated.name, logo: updated.logo ?? '' });
+      toast.push({ variant: 'success', title: trimmed ? 'Logo updated' : 'Logo removed', description: updated.name });
+    }
   };
 
   // ── Inventory (uses product list — inline stock/reorder edit) ────────────
@@ -2220,6 +2296,20 @@ function AdminDashboard() {
                     <input ref={brandFileRef} type="file" accept="image/*" className="hidden" onChange={e => onBrandLogo(e.target.files?.[0])} />
                   </div>
                 </div>
+                <div className="flex gap-2 mt-3">
+                  <input
+                    value={brandLogoUrlInput}
+                    onChange={e => setBrandLogoUrlInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addBrandLogoUrlToForm(brandLogoUrlInput); } }}
+                    onBlur={() => addBrandLogoUrlToForm(brandLogoUrlInput)}
+                    inputMode="url" enterKeyHint="done"
+                    placeholder="…or paste a logo image URL (https://…)"
+                    className="flex-1 min-w-0 px-3 py-2 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-lg text-[13px] text-white placeholder:text-[rgba(245,245,245,0.3)] focus:border-[#FF6B00] focus:outline-none" />
+                  <button type="button" onClick={() => addBrandLogoUrlToForm(brandLogoUrlInput)}
+                    className="shrink-0 px-4 py-2 bg-[#FF6B00] hover:bg-[#E55A00] text-white text-[12px] font-bold rounded-lg transition-all">
+                    Set
+                  </button>
+                </div>
                 <div className="flex items-center gap-3 mt-4">
                   {brandForm.logo && (
                     <div className="w-12 h-12 rounded-full overflow-hidden border border-[rgba(255,255,255,0.1)] bg-[#0a0a0a]">
@@ -2255,6 +2345,10 @@ function AdminDashboard() {
                       </button>
                       <span className="text-[12px] font-semibold text-white text-center leading-tight line-clamp-1">{b.name}</span>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => promptBrandLogoUrl(b.id)} aria-label={`Set ${b.name} logo via URL`} title="Set logo via URL"
+                          className="p-1 text-[rgba(245,245,245,0.5)] hover:text-[#FF6B00] hover:bg-[rgba(255,107,0,0.1)] rounded transition-all">
+                          <Link2 size={12} />
+                        </button>
                         {b.logo && (
                           <button onClick={() => clearBrandLogo(b.id)} aria-label={`Remove ${b.name} logo`} title="Remove logo"
                             className="p-1 text-[rgba(245,245,245,0.5)] hover:text-yellow-400 hover:bg-yellow-500/10 rounded transition-all">
@@ -3151,22 +3245,34 @@ function AdminDashboard() {
                 <section className="grid sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-[11px] font-bold text-[rgba(245,245,245,0.6)] uppercase tracking-wide mb-1.5">Flavors (comma-separated)</label>
-                    <input value={productDraft.flavors.join(', ')}
-                      onChange={e => setProductDraft(d => d ? { ...d, flavors: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } : d)}
+                    <input value={flavorsText}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setFlavorsText(v);
+                        setProductDraft(d => d ? { ...d, flavors: v.split(',').map(s => s.trim()).filter(Boolean) } : d);
+                      }}
                       placeholder="Chocolate, Vanilla"
                       className="w-full px-3.5 py-2.5 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-xl text-sm text-white placeholder:text-[rgba(245,245,245,0.3)] focus:border-[#FF6B00] focus:outline-none" />
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-[rgba(245,245,245,0.6)] uppercase tracking-wide mb-1.5">Sizes (comma-separated)</label>
-                    <input value={productDraft.sizes.join(', ')}
-                      onChange={e => setProductDraft(d => d ? { ...d, sizes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } : d)}
+                    <input value={sizesText}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setSizesText(v);
+                        setProductDraft(d => d ? { ...d, sizes: v.split(',').map(s => s.trim()).filter(Boolean) } : d);
+                      }}
                       placeholder="1kg, 2kg, 5lb"
                       className="w-full px-3.5 py-2.5 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-xl text-sm text-white placeholder:text-[rgba(245,245,245,0.3)] focus:border-[#FF6B00] focus:outline-none" />
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-[rgba(245,245,245,0.6)] uppercase tracking-wide mb-1.5">Tags (comma-separated)</label>
-                    <input value={productDraft.tags.join(', ')}
-                      onChange={e => setProductDraft(d => d ? { ...d, tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } : d)}
+                    <input value={tagsText}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setTagsText(v);
+                        setProductDraft(d => d ? { ...d, tags: v.split(',').map(s => s.trim()).filter(Boolean) } : d);
+                      }}
                       placeholder="whey, protein, muscle gain"
                       className="w-full px-3.5 py-2.5 bg-[#0a0a0a] border border-[rgba(255,255,255,0.1)] rounded-xl text-sm text-white placeholder:text-[rgba(245,245,245,0.3)] focus:border-[#FF6B00] focus:outline-none" />
                   </div>
